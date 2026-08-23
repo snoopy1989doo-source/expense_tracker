@@ -1,0 +1,117 @@
+import 'package:flutter/material.dart';
+import '../../models/wallet.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/utils/currency_formatter.dart';
+
+class WalletCard extends StatelessWidget {
+  final Wallet wallet;
+  final VoidCallback? onTap;
+  final bool isSelected;
+
+  const WalletCard({
+    super.key,
+    required this.wallet,
+    this.onTap,
+    this.isSelected = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final walletColor = AppColors.fromHex(wallet.color);
+
+    // Map icon string to Material Icons
+    IconData getIcon(String iconName) {
+      switch (iconName) {
+        case 'account_balance':
+          return Icons.account_balance;
+        case 'payments':
+          return Icons.payments;
+        case 'credit_card':
+          return Icons.credit_card;
+        case 'account_balance_wallet':
+        default:
+          return Icons.account_balance_wallet;
+      }
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 155,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.brightness == Brightness.light ? Colors.white : AppColors.cardDark,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? walletColor : (theme.brightness == Brightness.light ? AppColors.dividerLight : AppColors.dividerDark),
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            )
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: walletColor.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    getIcon(wallet.icon),
+                    color: walletColor,
+                    size: 20,
+                  ),
+                ),
+                if (isSelected)
+                  Icon(
+                    Icons.check_circle,
+                    color: walletColor,
+                    size: 20,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  wallet.name,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface.withOpacity(0.8),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  CurrencyFormatter.format(wallet.currentBalance),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: wallet.currentBalance >= 0 ? theme.colorScheme.onSurface : AppColors.expense,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
