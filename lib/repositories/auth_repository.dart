@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -14,6 +15,7 @@ class FirebaseAuthRepository implements AuthRepository {
   final fb.FirebaseAuth? _firebaseAuth;
   final SharedPreferences _prefs;
   bool _useLocalMock = false;
+  late final StreamController<String?> _mockAuthStreamController;
 
   FirebaseAuthRepository(this._firebaseAuth, this._prefs) {
     if (_firebaseAuth == null) {
@@ -25,13 +27,22 @@ class FirebaseAuthRepository implements AuthRepository {
         _useLocalMock = true;
       }
     }
+
+    if (_useLocalMock) {
+      _mockAuthStreamController = StreamController<String?>.broadcast();
+      // Emit initial value on next microtask
+      scheduleMicrotask(() {
+        if (!_mockAuthStreamController.isClosed) {
+          _mockAuthStreamController.add(_prefs.getString('mock_userId'));
+        }
+      });
+    }
   }
 
   @override
   Stream<String?> get authStateChanges {
     if (_useLocalMock) {
-      // Simple mock auth stream based on shared preferences
-      return Stream.value(_prefs.getString('mock_userId'));
+      return _mockAuthStreamController.stream;
     }
     return _firebaseAuth!.authStateChanges().map((user) => user?.uid);
   }
@@ -50,6 +61,7 @@ class FirebaseAuthRepository implements AuthRepository {
       if (email.contains('@') && password.length >= 6) {
         final mockId = 'mock_user_${email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
         await _prefs.setString('mock_userId', mockId);
+        _mockAuthStreamController.add(mockId);
         return mockId;
       }
       throw Exception('อีเมลหรือรหัสผ่านไม่ถูกต้อง (ขั้นต่ำ 6 ตัวอักษร)');
@@ -73,6 +85,7 @@ class FirebaseAuthRepository implements AuthRepository {
       if (email.contains('@') && password.length >= 6) {
         final mockId = 'mock_user_${email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
         await _prefs.setString('mock_userId', mockId);
+        _mockAuthStreamController.add(mockId);
         return mockId;
       }
       throw Exception('สมัครสมาชิกไม่สำเร็จ: อีเมลไม่ถูกต้องหรือรหัสผ่านสั้นเกินไป');
@@ -94,6 +107,7 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<void> signOut() async {
     if (_useLocalMock) {
       await _prefs.remove('mock_userId');
+      _mockAuthStreamController.add(null);
       return;
     }
     await _firebaseAuth!.signOut();
@@ -103,6 +117,7 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<void> loginAsGuest() async {
     if (_useLocalMock) {
       await _prefs.setString('mock_userId', 'guest_user');
+      _mockAuthStreamController.add('guest_user');
       return;
     }
     try {
@@ -112,6 +127,7 @@ class FirebaseAuthRepository implements AuthRepository {
     } catch (e) {
       // Fallback to local mock guest if sign in anonymously fails
       await _prefs.setString('mock_userId', 'guest_user');
+      _mockAuthStreamController.add('guest_user');
     }
   }
 
