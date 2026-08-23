@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'theme_provider.dart';
@@ -6,11 +7,11 @@ import '../models/main_category.dart';
 import '../models/sub_category.dart';
 import '../repositories/category_repository.dart';
 
-final firestoreProvider = Provider<FirebaseFirestore>((ref) {
+final firestoreProvider = Provider<FirebaseFirestore?>((ref) {
   try {
-    return FirebaseFirestore.instance;
+    return Firebase.apps.isNotEmpty ? FirebaseFirestore.instance : null;
   } catch (_) {
-    return FirebaseFirestore.instance;
+    return null;
   }
 });
 
@@ -46,20 +47,20 @@ class MainCategoriesNotifier extends StateNotifier<List<MainCategory>> {
   Future<void> loadCategories() async {
     if (_userId == null) return;
     try {
-      final list = await _repository.getMainCategories(_userId!);
+      final list = await _repository.getMainCategories(_userId);
       state = list;
     } catch (_) {}
   }
 
   Future<void> addCategory(MainCategory category) async {
     if (_userId == null) return;
-    await _repository.saveMainCategory(_userId!, category);
+    await _repository.saveMainCategory(_userId, category);
     await loadCategories();
   }
 
   Future<void> updateCategory(MainCategory category) async {
     if (_userId == null) return;
-    await _repository.saveMainCategory(_userId!, category);
+    await _repository.saveMainCategory(_userId, category);
     await loadCategories();
     // Refresh subcategories as well, because subcategory color inherits maincategory color
     await _ref.read(subCategoriesProvider.notifier).loadSubCategories();
@@ -67,7 +68,7 @@ class MainCategoriesNotifier extends StateNotifier<List<MainCategory>> {
 
   Future<void> deleteCategory(String categoryId) async {
     if (_userId == null) return;
-    await _repository.deleteMainCategory(_userId!, categoryId);
+    await _repository.deleteMainCategory(_userId, categoryId);
     await loadCategories();
     // Cascade reload subcategories
     await _ref.read(subCategoriesProvider.notifier).loadSubCategories();
@@ -75,7 +76,7 @@ class MainCategoriesNotifier extends StateNotifier<List<MainCategory>> {
 
   Future<void> resetToDefault() async {
     if (_userId == null) return;
-    await _repository.seedDefaultCategories(_userId!);
+    await _repository.seedDefaultCategories(_userId);
     await loadCategories();
     await _ref.read(subCategoriesProvider.notifier).loadSubCategories();
   }
@@ -92,26 +93,26 @@ class SubCategoriesNotifier extends StateNotifier<List<SubCategory>> {
   Future<void> loadSubCategories() async {
     if (_userId == null) return;
     try {
-      final list = await _repository.getSubCategories(_userId!);
+      final list = await _repository.getSubCategories(_userId);
       state = list;
     } catch (_) {}
   }
 
   Future<void> addSubCategory(SubCategory category) async {
     if (_userId == null) return;
-    await _repository.saveSubCategory(_userId!, category);
+    await _repository.saveSubCategory(_userId, category);
     await loadSubCategories();
   }
 
   Future<void> updateSubCategory(SubCategory category) async {
     if (_userId == null) return;
-    await _repository.saveSubCategory(_userId!, category);
+    await _repository.saveSubCategory(_userId, category);
     await loadSubCategories();
   }
 
   Future<void> deleteSubCategory(String subCategoryId) async {
     if (_userId == null) return;
-    await _repository.deleteSubCategory(_userId!, subCategoryId);
+    await _repository.deleteSubCategory(_userId, subCategoryId);
     await loadSubCategories();
   }
 }

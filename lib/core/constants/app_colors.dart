@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Brand / Primary
-  static const Color primary = Color(0xFF1E88E5);
-  static const Color primaryDark = Color(0xFF1565C0);
-  static const Color primaryLight = Color(0xFF64B5F6);
-  static const Color accent = Color(0xFF00B0FF);
+  // Brand / Primary (ถุงเงิน Blue / Cyan Theme)
+  static const Color primary = Color(0xFF007BC3);
+  static const Color primaryDark = Color(0xFF005A91);
+  static const Color primaryLight = Color(0xFFE1F5FE);
+  static const Color accent = Color(0xFF00B5F1);
 
   // Financial Indicators
   static const Color income = Color(0xFF2E7D32);      // Green

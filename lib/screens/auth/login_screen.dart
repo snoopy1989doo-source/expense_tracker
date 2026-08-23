@@ -62,15 +62,42 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo/Header
-                  Icon(
-                    Icons.account_balance_wallet,
-                    size: 80,
-                    color: theme.colorScheme.primary,
+                  // Logo/Header (ถุงเงิน Theme)
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              theme.colorScheme.primary,
+                              theme.colorScheme.primary.withOpacity(0.7),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: theme.colorScheme.primary.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            )
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.savings_rounded,
+                        size: 50,
+                        color: Colors.white,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   Text(
-                    'Money Agent',
+                    'ถุงเงินส่วนตัว',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.displayMedium?.copyWith(
                       fontSize: 32,

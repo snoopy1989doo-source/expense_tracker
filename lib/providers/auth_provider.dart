@@ -1,14 +1,14 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'theme_provider.dart';
 import '../repositories/auth_repository.dart';
 
-final firebaseAuthProvider = Provider<fb.FirebaseAuth>((ref) {
+final firebaseAuthProvider = Provider<fb.FirebaseAuth?>((ref) {
   try {
-    return fb.FirebaseAuth.instance;
+    return Firebase.apps.isNotEmpty ? fb.FirebaseAuth.instance : null;
   } catch (_) {
-    // Return dummy/mock or let it fail gracefully in repository
-    return fb.FirebaseAuth.instance;
+    return null;
   }
 });
 

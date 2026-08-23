@@ -8,14 +8,18 @@ abstract class StorageRepository {
 }
 
 class FirebaseStorageRepository implements StorageRepository {
-  final s.FirebaseStorage _storage;
+  final s.FirebaseStorage? _storage;
   bool _useLocalMock = false;
 
   FirebaseStorageRepository(this._storage) {
-    try {
-      _storage.app;
-    } catch (_) {
+    if (_storage == null) {
       _useLocalMock = true;
+    } else {
+      try {
+        _storage.app;
+      } catch (_) {
+        _useLocalMock = true;
+      }
     }
   }
 
@@ -25,7 +29,7 @@ class FirebaseStorageRepository implements StorageRepository {
       return _saveLocalMockImage(transactionId, file);
     }
     try {
-      final ref = _storage.ref().child('users/$userId/receipts/$transactionId.jpg');
+      final ref = _storage!.ref().child('users/$userId/receipts/$transactionId.jpg');
       final uploadTask = await ref.putFile(file);
       final downloadUrl = await uploadTask.ref.getDownloadURL();
       return downloadUrl;

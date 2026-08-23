@@ -10,15 +10,19 @@ abstract class TransactionRepository {
 }
 
 class FirestoreTransactionRepository implements TransactionRepository {
-  final FirebaseFirestore _firestore;
+  final FirebaseFirestore? _firestore;
   final SharedPreferences _prefs;
   bool _useLocalMock = false;
 
   FirestoreTransactionRepository(this._firestore, this._prefs) {
-    try {
-      _firestore.app;
-    } catch (_) {
+    if (_firestore == null) {
       _useLocalMock = true;
+    } else {
+      try {
+        _firestore.app;
+      } catch (_) {
+        _useLocalMock = true;
+      }
     }
   }
 
@@ -28,7 +32,7 @@ class FirestoreTransactionRepository implements TransactionRepository {
       return _getLocalTransactions(userId);
     }
     try {
-      final snapshot = await _firestore
+      final snapshot = await _firestore!
           .collection('users')
           .doc(userId)
           .collection('transactions')
@@ -50,7 +54,7 @@ class FirestoreTransactionRepository implements TransactionRepository {
       return;
     }
     try {
-      await _firestore
+      await _firestore!
           .collection('users')
           .doc(userId)
           .collection('transactions')
@@ -68,7 +72,7 @@ class FirestoreTransactionRepository implements TransactionRepository {
       return;
     }
     try {
-      await _firestore
+      await _firestore!
           .collection('users')
           .doc(userId)
           .collection('transactions')

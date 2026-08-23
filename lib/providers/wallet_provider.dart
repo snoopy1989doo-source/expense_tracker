@@ -53,32 +53,32 @@ class RawWalletsNotifier extends StateNotifier<List<Wallet>> {
   Future<void> loadWallets() async {
     if (_userId == null) return;
     try {
-      final list = await _repository.getWallets(_userId!);
+      final list = await _repository.getWallets(_userId);
       state = list;
     } catch (_) {}
   }
 
   Future<void> addWallet(Wallet wallet) async {
     if (_userId == null) return;
-    await _repository.saveWallet(_userId!, wallet);
+    await _repository.saveWallet(_userId, wallet);
     await loadWallets();
   }
 
   Future<void> updateWallet(Wallet wallet) async {
     if (_userId == null) return;
-    await _repository.saveWallet(_userId!, wallet);
+    await _repository.saveWallet(_userId, wallet);
     await loadWallets();
   }
 
   Future<void> deleteWallet(String walletId) async {
     if (_userId == null) return;
-    await _repository.deleteWallet(_userId!, walletId);
+    await _repository.deleteWallet(_userId, walletId);
     await loadWallets();
   }
 
   Future<void> resetToDefault() async {
     if (_userId == null) return;
-    await _repository.seedDefaultWallets(_userId!);
+    await _repository.seedDefaultWallets(_userId);
     await loadWallets();
   }
 }

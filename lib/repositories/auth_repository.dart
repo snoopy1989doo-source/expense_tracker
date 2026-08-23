@@ -11,17 +11,19 @@ abstract class AuthRepository {
 }
 
 class FirebaseAuthRepository implements AuthRepository {
-  final fb.FirebaseAuth _firebaseAuth;
+  final fb.FirebaseAuth? _firebaseAuth;
   final SharedPreferences _prefs;
   bool _useLocalMock = false;
 
   FirebaseAuthRepository(this._firebaseAuth, this._prefs) {
-    // Check if Firebase is initialized and working, or if we should default to mock
-    try {
-      // Just a quick check to see if firebase auth works
-      _firebaseAuth.app;
-    } catch (_) {
+    if (_firebaseAuth == null) {
       _useLocalMock = true;
+    } else {
+      try {
+        _firebaseAuth.app;
+      } catch (_) {
+        _useLocalMock = true;
+      }
     }
   }
 
@@ -31,7 +33,7 @@ class FirebaseAuthRepository implements AuthRepository {
       // Simple mock auth stream based on shared preferences
       return Stream.value(_prefs.getString('mock_userId'));
     }
-    return _firebaseAuth.authStateChanges().map((user) => user?.uid);
+    return _firebaseAuth!.authStateChanges().map((user) => user?.uid);
   }
 
   @override
@@ -39,7 +41,7 @@ class FirebaseAuthRepository implements AuthRepository {
     if (_useLocalMock) {
       return _prefs.getString('mock_userId');
     }
-    return _firebaseAuth.currentUser?.uid;
+    return _firebaseAuth!.currentUser?.uid;
   }
 
   @override
@@ -53,7 +55,7 @@ class FirebaseAuthRepository implements AuthRepository {
       throw Exception('อีเมลหรือรหัสผ่านไม่ถูกต้อง (ขั้นต่ำ 6 ตัวอักษร)');
     }
     try {
-      final credential = await _firebaseAuth.signInWithEmailAndPassword(
+      final credential = await _firebaseAuth!.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -76,7 +78,7 @@ class FirebaseAuthRepository implements AuthRepository {
       throw Exception('สมัครสมาชิกไม่สำเร็จ: อีเมลไม่ถูกต้องหรือรหัสผ่านสั้นเกินไป');
     }
     try {
-      final credential = await _firebaseAuth.createUserWithEmailAndPassword(
+      final credential = await _firebaseAuth!.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -94,7 +96,7 @@ class FirebaseAuthRepository implements AuthRepository {
       await _prefs.remove('mock_userId');
       return;
     }
-    await _firebaseAuth.signOut();
+    await _firebaseAuth!.signOut();
   }
 
   @override
@@ -104,7 +106,7 @@ class FirebaseAuthRepository implements AuthRepository {
       return;
     }
     try {
-      final credential = await _firebaseAuth.signInAnonymously();
+      final credential = await _firebaseAuth!.signInAnonymously();
       // Tag it in prefs too
       await _prefs.setString('mock_userId', credential.user?.uid ?? 'guest_user');
     } catch (e) {

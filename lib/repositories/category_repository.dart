@@ -17,15 +17,19 @@ abstract class CategoryRepository {
 }
 
 class FirestoreCategoryRepository implements CategoryRepository {
-  final FirebaseFirestore _firestore;
+  final FirebaseFirestore? _firestore;
   final SharedPreferences _prefs;
   bool _useLocalMock = false;
 
   FirestoreCategoryRepository(this._firestore, this._prefs) {
-    try {
-      _firestore.app;
-    } catch (_) {
+    if (_firestore == null) {
       _useLocalMock = true;
+    } else {
+      try {
+        _firestore.app;
+      } catch (_) {
+        _useLocalMock = true;
+      }
     }
   }
 
@@ -37,7 +41,7 @@ class FirestoreCategoryRepository implements CategoryRepository {
       return _getLocalMainCategories(userId);
     }
     try {
-      final snapshot = await _firestore
+      final snapshot = await _firestore!
           .collection('users')
           .doc(userId)
           .collection('mainCategories')
@@ -66,7 +70,7 @@ class FirestoreCategoryRepository implements CategoryRepository {
       return;
     }
     try {
-      await _firestore
+      await _firestore!
           .collection('users')
           .doc(userId)
           .collection('mainCategories')
@@ -84,7 +88,7 @@ class FirestoreCategoryRepository implements CategoryRepository {
       return;
     }
     try {
-      await _firestore
+      await _firestore!
           .collection('users')
           .doc(userId)
           .collection('mainCategories')
@@ -111,7 +115,7 @@ class FirestoreCategoryRepository implements CategoryRepository {
       return _getLocalSubCategories(userId);
     }
     try {
-      final snapshot = await _firestore
+      final snapshot = await _firestore!
           .collection('users')
           .doc(userId)
           .collection('subCategories')
@@ -133,7 +137,7 @@ class FirestoreCategoryRepository implements CategoryRepository {
       return;
     }
     try {
-      await _firestore
+      await _firestore!
           .collection('users')
           .doc(userId)
           .collection('subCategories')
@@ -151,7 +155,7 @@ class FirestoreCategoryRepository implements CategoryRepository {
       return;
     }
     try {
-      await _firestore
+      await _firestore!
           .collection('users')
           .doc(userId)
           .collection('subCategories')

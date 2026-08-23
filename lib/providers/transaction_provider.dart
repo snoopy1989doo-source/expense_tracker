@@ -195,7 +195,7 @@ class RawTransactionsNotifier extends StateNotifier<List<TransactionItem>> {
   Future<void> loadTransactions() async {
     if (_userId == null) return;
     try {
-      final list = await _repository.getTransactions(_userId!);
+      final list = await _repository.getTransactions(_userId);
       state = list;
     } catch (_) {}
   }
@@ -206,12 +206,12 @@ class RawTransactionsNotifier extends StateNotifier<List<TransactionItem>> {
     var finalTx = transaction;
     if (receiptFile != null && storageRepo != null) {
       try {
-        final downloadUrl = await storageRepo.uploadReceiptImage(_userId!, transaction.id, receiptFile);
+        final downloadUrl = await storageRepo.uploadReceiptImage(_userId, transaction.id, receiptFile);
         finalTx = transaction.copyWith(receiptImageUrl: downloadUrl);
       } catch (_) {}
     }
 
-    await _repository.saveTransaction(_userId!, finalTx);
+    await _repository.saveTransaction(_userId, finalTx);
     await loadTransactions();
   }
 
@@ -221,18 +221,18 @@ class RawTransactionsNotifier extends StateNotifier<List<TransactionItem>> {
     var finalTx = transaction;
     if (receiptFile != null && storageRepo != null) {
       try {
-        final downloadUrl = await storageRepo.uploadReceiptImage(_userId!, transaction.id, receiptFile);
+        final downloadUrl = await storageRepo.uploadReceiptImage(_userId, transaction.id, receiptFile);
         finalTx = transaction.copyWith(receiptImageUrl: downloadUrl);
       } catch (_) {}
     }
 
-    await _repository.saveTransaction(_userId!, finalTx);
+    await _repository.saveTransaction(_userId, finalTx);
     await loadTransactions();
   }
 
   Future<void> deleteTransaction(String transactionId) async {
     if (_userId == null) return;
-    await _repository.deleteTransaction(_userId!, transactionId);
+    await _repository.deleteTransaction(_userId, transactionId);
     await loadTransactions();
   }
 }

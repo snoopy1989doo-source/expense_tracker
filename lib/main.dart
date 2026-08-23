@@ -46,7 +46,7 @@ class MyApp extends ConsumerWidget {
     final onboardingCompleted = ref.watch(onboardingCompletedProvider);
 
     return MaterialApp(
-      title: 'Money Agent',
+      title: 'ถุงเงินส่วนตัว',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

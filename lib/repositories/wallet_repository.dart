@@ -12,15 +12,19 @@ abstract class WalletRepository {
 }
 
 class FirestoreWalletRepository implements WalletRepository {
-  final FirebaseFirestore _firestore;
+  final FirebaseFirestore? _firestore;
   final SharedPreferences _prefs;
   bool _useLocalMock = false;
 
   FirestoreWalletRepository(this._firestore, this._prefs) {
-    try {
-      _firestore.app;
-    } catch (_) {
+    if (_firestore == null) {
       _useLocalMock = true;
+    } else {
+      try {
+        _firestore.app;
+      } catch (_) {
+        _useLocalMock = true;
+      }
     }
   }
 
@@ -30,7 +34,7 @@ class FirestoreWalletRepository implements WalletRepository {
       return _getLocalWallets(userId);
     }
     try {
-      final snapshot = await _firestore
+      final snapshot = await _firestore!
           .collection('users')
           .doc(userId)
           .collection('wallets')
@@ -57,7 +61,7 @@ class FirestoreWalletRepository implements WalletRepository {
       return;
     }
     try {
-      await _firestore
+      await _firestore!
           .collection('users')
           .doc(userId)
           .collection('wallets')
@@ -75,7 +79,7 @@ class FirestoreWalletRepository implements WalletRepository {
       return;
     }
     try {
-      await _firestore
+      await _firestore!
           .collection('users')
           .doc(userId)
           .collection('wallets')
