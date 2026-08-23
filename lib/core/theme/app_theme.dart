@@ -22,13 +22,15 @@ class AppTheme {
         onError: Colors.white,
       ),
       scaffoldBackgroundColor: AppColors.backgroundLight,
-      textTheme: _addEmojiFallbacks(baseTextTheme).copyWith(
-        displayLarge: baseTextTheme.displayLarge?.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimaryLight, fontFamilyFallback: const ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji']),
-        titleLarge: baseTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight, fontFamilyFallback: const ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji']),
-        titleMedium: baseTextTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight, fontFamilyFallback: const ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji']),
-        bodyLarge: baseTextTheme.bodyLarge?.copyWith(color: AppColors.textPrimaryLight, fontFamilyFallback: const ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji']),
-        bodyMedium: baseTextTheme.bodyMedium?.copyWith(color: AppColors.textPrimaryLight, fontFamilyFallback: const ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji']),
-        bodySmall: baseTextTheme.bodySmall?.copyWith(color: AppColors.textSecondaryLight, fontFamilyFallback: const ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji']),
+      textTheme: _addEmojiFallbacks(
+        baseTextTheme.copyWith(
+          displayLarge: baseTextTheme.displayLarge?.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimaryLight),
+          titleLarge: baseTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
+          titleMedium: baseTextTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
+          bodyLarge: baseTextTheme.bodyLarge?.copyWith(color: AppColors.textPrimaryLight),
+          bodyMedium: baseTextTheme.bodyMedium?.copyWith(color: AppColors.textPrimaryLight),
+          bodySmall: baseTextTheme.bodySmall?.copyWith(color: AppColors.textSecondaryLight),
+        ),
       ),
       appBarTheme: AppBarTheme(
         elevation: 0,
@@ -115,13 +117,15 @@ class AppTheme {
         onError: Colors.white,
       ),
       scaffoldBackgroundColor: AppColors.backgroundDark,
-      textTheme: _addEmojiFallbacks(baseTextTheme).copyWith(
-        displayLarge: baseTextTheme.displayLarge?.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimaryDark, fontFamilyFallback: const ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji']),
-        titleLarge: baseTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimaryDark, fontFamilyFallback: const ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji']),
-        titleMedium: baseTextTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimaryDark, fontFamilyFallback: const ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji']),
-        bodyLarge: baseTextTheme.bodyLarge?.copyWith(color: AppColors.textPrimaryDark, fontFamilyFallback: const ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji']),
-        bodyMedium: baseTextTheme.bodyMedium?.copyWith(color: AppColors.textPrimaryDark, fontFamilyFallback: const ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji']),
-        bodySmall: baseTextTheme.bodySmall?.copyWith(color: AppColors.textSecondaryDark, fontFamilyFallback: const ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji']),
+      textTheme: _addEmojiFallbacks(
+        baseTextTheme.copyWith(
+          displayLarge: baseTextTheme.displayLarge?.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimaryDark),
+          titleLarge: baseTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimaryDark),
+          titleMedium: baseTextTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimaryDark),
+          bodyLarge: baseTextTheme.bodyLarge?.copyWith(color: AppColors.textPrimaryDark),
+          bodyMedium: baseTextTheme.bodyMedium?.copyWith(color: AppColors.textPrimaryDark),
+          bodySmall: baseTextTheme.bodySmall?.copyWith(color: AppColors.textSecondaryDark),
+        ),
       ),
       appBarTheme: AppBarTheme(
         elevation: 0,
