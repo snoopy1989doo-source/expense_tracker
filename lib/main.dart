@@ -46,7 +46,7 @@ class MyApp extends ConsumerWidget {
     final onboardingCompleted = ref.watch(onboardingCompletedProvider);
 
     return MaterialApp(
-      title: 'ถุงเงินส่วนตัว',
+      title: 'ถุงเงินคู่รัก',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

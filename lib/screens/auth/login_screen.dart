@@ -62,7 +62,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo/Header (ถุงเงิน Theme)
+                  // Logo/Header (ถุงเงินคู่รัก Pink Theme)
                   Stack(
                     alignment: Alignment.center,
                     children: [
@@ -88,16 +88,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ],
                         ),
                       ),
-                      const Icon(
-                        Icons.savings_rounded,
-                        size: 50,
-                        color: Colors.white,
+                      const Text(
+                        '💰',
+                        style: TextStyle(fontSize: 48),
                       ),
                     ],
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'ถุงเงินส่วนตัว',
+                    'ถุงเงินคู่รัก',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.displayMedium?.copyWith(
                       fontSize: 32,
@@ -107,7 +106,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'บันทึกรายรับ-รายจ่ายส่วนตัวอย่างชาญฉลาด',
+                    'บันทึกรายรับ-รายจ่ายร่วมกันสำหรับคู่รัก',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
