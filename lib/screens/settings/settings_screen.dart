@@ -104,7 +104,7 @@ class SettingsScreen extends ConsumerWidget {
                     return const Text('สร้างห้องใหม่ หรือกรอกโค้ดเพื่อเริ่มบันทึกเงินร่วมกัน');
                   }
                   final memberCount = room.memberIds.length;
-                  return Text('รหัสเชิญแฟน: ${room.inviteCode} (${memberCount}/2 คน)');
+                  return Text('รหัสเชิญแฟน: ${room.inviteCode} ($memberCount/2 คน)');
                 },
                 loading: () => const Text('กำลังโหลดข้อมูลห้องคู่รัก...'),
                 error: (_, __) => const Text('กดเพื่อสร้างหรือเชื่อมต่อห้องคู่รัก'),

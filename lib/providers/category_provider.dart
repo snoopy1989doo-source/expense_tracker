@@ -1,4 +1,4 @@
-﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_provider.dart';
 import 'couple_provider.dart';
 import 'theme_provider.dart';
@@ -69,6 +69,15 @@ class MainCategoriesNotifier extends StateNotifier<List<MainCategory>> {
     await _ref.read(subCategoriesProvider.notifier).loadSubCategories();
   }
 
+  Future<void> reorderCategories(List<MainCategory> reordered) async {
+    if (_roomId == null) return;
+    state = reordered;
+    for (int i = 0; i < reordered.length; i++) {
+      final updated = reordered[i].copyWith(order: i);
+      await _repository.saveMainCategory(_roomId, updated);
+    }
+  }
+
   Future<void> resetToDefault() async {
     if (_roomId == null) return;
     await _repository.seedDefaultCategories(_roomId);
@@ -91,6 +100,20 @@ class SubCategoriesNotifier extends StateNotifier<List<SubCategory>> {
       final list = await _repository.getSubCategories(_roomId);
       state = list;
     } catch (_) {}
+  }
+
+  Future<void> reorderSubCategories(List<SubCategory> reordered) async {
+    if (_roomId == null) return;
+    // Update local state immediately for instant feedback
+    final currentList = List<SubCategory>.from(state);
+    final idsToUpdate = reordered.map((s) => s.id).toSet();
+    final remaining = currentList.where((s) => !idsToUpdate.contains(s.id)).toList();
+    state = [...reordered, ...remaining];
+
+    for (int i = 0; i < reordered.length; i++) {
+      final updated = reordered[i].copyWith(order: i);
+      await _repository.saveSubCategory(_roomId, updated);
+    }
   }
 
   Future<void> addSubCategory(SubCategory category) async {

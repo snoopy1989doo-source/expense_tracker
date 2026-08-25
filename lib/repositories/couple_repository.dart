@@ -65,8 +65,9 @@ class CoupleRepository {
     if (!_isAvailable) throw Exception('Firebase ไม่พร้อมใช้งาน');
 
     try {
+      final db = _firestore!;
       // Look up invite code
-      final codeDoc = await _firestore!
+      final codeDoc = await db
           .collection('invite_codes')
           .doc(inviteCode.toUpperCase())
           .get();
@@ -76,7 +77,7 @@ class CoupleRepository {
       final roomId = codeDoc.data()!['roomId'] as String;
 
       // Get the room
-      final roomDoc = await _firestore!.collection('couple_rooms').doc(roomId).get();
+      final roomDoc = await db.collection('couple_rooms').doc(roomId).get();
       if (!roomDoc.exists) throw Exception('ไม่พบห้องคู่รัก กรุณาติดต่อผู้สร้างห้อง');
 
       final room = CoupleRoom.fromMap(roomDoc.data()!, roomDoc.id);
@@ -87,16 +88,16 @@ class CoupleRepository {
 
       if (!room.memberIds.contains(userId)) {
         // Add this user to the room
-        await _firestore!.collection('couple_rooms').doc(roomId).update({
+        await db.collection('couple_rooms').doc(roomId).update({
           'memberIds': FieldValue.arrayUnion([userId]),
         });
       }
 
       // Delete invite code after joining (one-time use)
-      await _firestore!.collection('invite_codes').doc(inviteCode.toUpperCase()).delete();
+      await db.collection('invite_codes').doc(inviteCode.toUpperCase()).delete();
 
       // Return updated room
-      final updatedDoc = await _firestore!.collection('couple_rooms').doc(roomId).get();
+      final updatedDoc = await db.collection('couple_rooms').doc(roomId).get();
       return CoupleRoom.fromMap(updatedDoc.data()!, updatedDoc.id);
     } on FirebaseException catch (e) {
       if (e.code == 'permission-denied') {

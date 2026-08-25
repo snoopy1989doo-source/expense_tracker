@@ -274,6 +274,7 @@ class _CategoryManagementScreenState extends ConsumerState<CategoryManagementScr
   Widget build(BuildContext context) {
     final mainCats = ref.watch(mainCategoriesProvider);
     final subCats = ref.watch(subCategoriesProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -289,20 +290,38 @@ class _CategoryManagementScreenState extends ConsumerState<CategoryManagementScr
       body: TabBarView(
         controller: _tabController,
         children: [
-          // Tab 1: Main categories
+          // Tab 1: Main categories (Reorderable)
           mainCats.isEmpty
               ? const Center(child: Text('ไม่มีหมวดหมู่หลัก'))
-              : ListView.builder(
+              : ReorderableListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: mainCats.length,
+                  onReorder: (oldIndex, newIndex) {
+                    final items = List<MainCategory>.from(mainCats);
+                    if (oldIndex < newIndex) {
+                      newIndex -= 1;
+                    }
+                    final item = items.removeAt(oldIndex);
+                    items.insert(newIndex, item);
+                    ref.read(mainCategoriesProvider.notifier).reorderCategories(items);
+                  },
                   itemBuilder: (context, index) {
                     final cat = mainCats[index];
                     final catColor = AppColors.fromHex(cat.color);
                     return Card(
+                      key: ValueKey(cat.id),
+                      margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: catColor.withOpacity(0.12),
-                          child: Text(cat.emoji, style: const TextStyle(fontSize: 20)),
+                        leading: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.drag_handle, color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                            const SizedBox(width: 8),
+                            CircleAvatar(
+                              backgroundColor: catColor.withOpacity(0.12),
+                              child: Text(cat.emoji, style: const TextStyle(fontSize: 20)),
+                            ),
+                          ],
                         ),
                         title: Text(cat.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                         trailing: Row(
@@ -323,33 +342,60 @@ class _CategoryManagementScreenState extends ConsumerState<CategoryManagementScr
                   },
                 ),
 
-          // Tab 2: Sub categories
-          subCats.isEmpty
+          // Tab 2: Sub categories (Reorderable per Main Category)
+          subCats.isEmpty && mainCats.isEmpty
               ? const Center(child: Text('ไม่มีหมวดหมู่ย่อย'))
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: mainCats.length,
                   itemBuilder: (context, index) {
                     final parent = mainCats[index];
-                    final subsInParent = subCats.where((s) => s.mainCategoryId == parent.id).toList();
+                    final subsInParent = subCats.where((s) => s.mainCategoryId == parent.id).toList()
+                      ..sort((a, b) => a.order.compareTo(b.order));
 
                     return ExpansionTile(
+                      key: ValueKey('parent_${parent.id}'),
                       title: Row(
                         children: [
                           Text(parent.emoji),
                           const SizedBox(width: 8),
                           Text(parent.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          const SizedBox(width: 8),
+                          Text('(${subsInParent.length})', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withOpacity(0.5))),
                         ],
                       ),
-                      childrenPadding: const EdgeInsets.only(left: 12),
+                      childrenPadding: const EdgeInsets.only(left: 12, bottom: 8),
                       children: [
                         if (subsInParent.isEmpty)
                           const ListTile(
                             title: Text('ไม่มีหมวดหมู่ย่อย', style: TextStyle(fontSize: 13, color: Colors.grey)),
                           )
                         else
-                          ...subsInParent.map((sub) => ListTile(
-                                leading: Text(sub.emoji, style: const TextStyle(fontSize: 16)),
+                          ReorderableListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: subsInParent.length,
+                            onReorder: (oldIndex, newIndex) {
+                              final items = List<SubCategory>.from(subsInParent);
+                              if (oldIndex < newIndex) {
+                                newIndex -= 1;
+                              }
+                              final item = items.removeAt(oldIndex);
+                              items.insert(newIndex, item);
+                              ref.read(subCategoriesProvider.notifier).reorderSubCategories(items);
+                            },
+                            itemBuilder: (context, subIndex) {
+                              final sub = subsInParent[subIndex];
+                              return ListTile(
+                                key: ValueKey(sub.id),
+                                leading: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.drag_handle, size: 20, color: theme.colorScheme.onSurface.withOpacity(0.3)),
+                                    const SizedBox(width: 8),
+                                    Text(sub.emoji, style: const TextStyle(fontSize: 16)),
+                                  ],
+                                ),
                                 title: Text(sub.name, style: const TextStyle(fontSize: 14)),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -364,7 +410,9 @@ class _CategoryManagementScreenState extends ConsumerState<CategoryManagementScr
                                     ),
                                   ],
                                 ),
-                              )),
+                              );
+                            },
+                          ),
                       ],
                     );
                   },
