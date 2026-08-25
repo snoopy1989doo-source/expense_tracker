@@ -1,19 +1,18 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../models/main_category.dart';
-import '../../models/sub_category.dart';
+import '../models/main_category.dart';
+import '../models/sub_category.dart';
 import '../core/constants/default_categories.dart';
 
 abstract class CategoryRepository {
-  Future<List<MainCategory>> getMainCategories(String userId);
-  Future<void> saveMainCategory(String userId, MainCategory category);
-  Future<void> deleteMainCategory(String userId, String categoryId);
-
-  Future<List<SubCategory>> getSubCategories(String userId);
-  Future<void> saveSubCategory(String userId, SubCategory category);
-  Future<void> deleteSubCategory(String userId, String subCategoryId);
-  Future<void> seedDefaultCategories(String userId);
+  Future<List<MainCategory>> getMainCategories(String roomId);
+  Future<void> saveMainCategory(String roomId, MainCategory category);
+  Future<void> deleteMainCategory(String roomId, String categoryId);
+  Future<List<SubCategory>> getSubCategories(String roomId);
+  Future<void> saveSubCategory(String roomId, SubCategory category);
+  Future<void> deleteSubCategory(String roomId, String subCategoryId);
+  Future<void> seedDefaultCategories(String roomId);
 }
 
 class FirestoreCategoryRepository implements CategoryRepository {
@@ -33,141 +32,103 @@ class FirestoreCategoryRepository implements CategoryRepository {
     }
   }
 
-  // --- Main Categories ---
+  CollectionReference _roomColl(String roomId, String sub) =>
+      _firestore!.collection('couple_rooms').doc(roomId).collection(sub);
 
   @override
-  Future<List<MainCategory>> getMainCategories(String userId) async {
-    if (_useLocalMock || userId == 'guest_user') {
-      return _getLocalMainCategories(userId);
-    }
+  Future<List<MainCategory>> getMainCategories(String roomId) async {
+    if (_useLocalMock || roomId == 'guest_user') return _getLocalMainCategories(roomId);
     try {
-      final snapshot = await _firestore!
-          .collection('users')
-          .doc(userId)
-          .collection('mainCategories')
-          .orderBy('order')
-          .get();
-      
+      final snapshot = await _roomColl(roomId, 'mainCategories').orderBy('order').get();
       if (snapshot.docs.isEmpty) {
-        // If empty, automatically seed defaults and retrieve again
-        await seedDefaultCategories(userId);
-        return getMainCategories(userId);
+        await seedDefaultCategories(roomId);
+        return getMainCategories(roomId);
       }
-
       return snapshot.docs
-          .map((doc) => MainCategory.fromMap(doc.data(), doc.id))
+          .map((doc) => MainCategory.fromMap(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
     } catch (e) {
-      // Fallback to local on connection/permission errors
-      return _getLocalMainCategories(userId);
+      return _getLocalMainCategories(roomId);
     }
   }
 
   @override
-  Future<void> saveMainCategory(String userId, MainCategory category) async {
-    if (_useLocalMock || userId == 'guest_user') {
-      await _saveLocalMainCategory(userId, category);
+  Future<void> saveMainCategory(String roomId, MainCategory category) async {
+    if (_useLocalMock || roomId == 'guest_user') {
+      await _saveLocalMainCategory(roomId, category);
       return;
     }
     try {
-      await _firestore!
-          .collection('users')
-          .doc(userId)
-          .collection('mainCategories')
+      await _roomColl(roomId, 'mainCategories')
           .doc(category.id)
           .set(category.toMap(), SetOptions(merge: true));
     } catch (e) {
-      await _saveLocalMainCategory(userId, category);
+      await _saveLocalMainCategory(roomId, category);
     }
   }
 
   @override
-  Future<void> deleteMainCategory(String userId, String categoryId) async {
-    if (_useLocalMock || userId == 'guest_user') {
-      await _deleteLocalMainCategory(userId, categoryId);
+  Future<void> deleteMainCategory(String roomId, String categoryId) async {
+    if (_useLocalMock || roomId == 'guest_user') {
+      await _deleteLocalMainCategory(roomId, categoryId);
       return;
     }
     try {
-      await _firestore!
-          .collection('users')
-          .doc(userId)
-          .collection('mainCategories')
-          .doc(categoryId)
-          .delete();
-      
-      // Cascade delete: delete all subcategories belonging to this category
-      final subCats = await getSubCategories(userId);
+      await _roomColl(roomId, 'mainCategories').doc(categoryId).delete();
+      final subCats = await getSubCategories(roomId);
       for (var sub in subCats) {
         if (sub.mainCategoryId == categoryId) {
-          await deleteSubCategory(userId, sub.id);
+          await deleteSubCategory(roomId, sub.id);
         }
       }
     } catch (e) {
-      await _deleteLocalMainCategory(userId, categoryId);
+      await _deleteLocalMainCategory(roomId, categoryId);
     }
   }
 
-  // --- Sub Categories ---
-
   @override
-  Future<List<SubCategory>> getSubCategories(String userId) async {
-    if (_useLocalMock || userId == 'guest_user') {
-      return _getLocalSubCategories(userId);
-    }
+  Future<List<SubCategory>> getSubCategories(String roomId) async {
+    if (_useLocalMock || roomId == 'guest_user') return _getLocalSubCategories(roomId);
     try {
-      final snapshot = await _firestore!
-          .collection('users')
-          .doc(userId)
-          .collection('subCategories')
-          .orderBy('order')
-          .get();
-
+      final snapshot = await _roomColl(roomId, 'subCategories').orderBy('order').get();
       return snapshot.docs
-          .map((doc) => SubCategory.fromMap(doc.data(), doc.id))
+          .map((doc) => SubCategory.fromMap(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
     } catch (e) {
-      return _getLocalSubCategories(userId);
+      return _getLocalSubCategories(roomId);
     }
   }
 
   @override
-  Future<void> saveSubCategory(String userId, SubCategory category) async {
-    if (_useLocalMock || userId == 'guest_user') {
-      await _saveLocalSubCategory(userId, category);
+  Future<void> saveSubCategory(String roomId, SubCategory category) async {
+    if (_useLocalMock || roomId == 'guest_user') {
+      await _saveLocalSubCategory(roomId, category);
       return;
     }
     try {
-      await _firestore!
-          .collection('users')
-          .doc(userId)
-          .collection('subCategories')
+      await _roomColl(roomId, 'subCategories')
           .doc(category.id)
           .set(category.toMap(), SetOptions(merge: true));
     } catch (e) {
-      await _saveLocalSubCategory(userId, category);
+      await _saveLocalSubCategory(roomId, category);
     }
   }
 
   @override
-  Future<void> deleteSubCategory(String userId, String subCategoryId) async {
-    if (_useLocalMock || userId == 'guest_user') {
-      await _deleteLocalSubCategory(userId, subCategoryId);
+  Future<void> deleteSubCategory(String roomId, String subCategoryId) async {
+    if (_useLocalMock || roomId == 'guest_user') {
+      await _deleteLocalSubCategory(roomId, subCategoryId);
       return;
     }
     try {
-      await _firestore!
-          .collection('users')
-          .doc(userId)
-          .collection('subCategories')
-          .doc(subCategoryId)
-          .delete();
+      await _roomColl(roomId, 'subCategories').doc(subCategoryId).delete();
     } catch (e) {
-      await _deleteLocalSubCategory(userId, subCategoryId);
+      await _deleteLocalSubCategory(roomId, subCategoryId);
     }
   }
 
   @override
-  Future<void> seedDefaultCategories(String userId) async {
+  Future<void> seedDefaultCategories(String roomId) async {
     for (var defaultCat in DefaultCategoriesData.defaultList) {
       final mainCat = MainCategory(
         id: defaultCat.id,
@@ -178,31 +139,29 @@ class FirestoreCategoryRepository implements CategoryRepository {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      await saveMainCategory(userId, mainCat);
-
+      await saveMainCategory(roomId, mainCat);
       for (var defaultSub in defaultCat.subCategories) {
         final subCat = SubCategory(
           id: defaultSub.id,
           mainCategoryId: defaultCat.id,
           name: defaultSub.name,
           emoji: defaultSub.emoji,
-          color: defaultCat.colorHex, // inherit
+          color: defaultCat.colorHex,
           order: defaultSub.order,
         );
-        await saveSubCategory(userId, subCat);
+        await saveSubCategory(roomId, subCat);
       }
     }
   }
 
-  // --- Local JSON Storage Helpers ---
+  // --- Local Storage Helpers ---
 
-  Future<List<MainCategory>> _getLocalMainCategories(String userId) async {
-    final key = 'local_main_categories_$userId';
+  Future<List<MainCategory>> _getLocalMainCategories(String roomId) async {
+    final key = 'local_main_categories_';
     final jsonStr = _prefs.getString(key);
     if (jsonStr == null) {
-      // Seed first time locally
-      await seedDefaultCategories(userId);
-      return _getLocalMainCategories(userId);
+      await seedDefaultCategories(roomId);
+      return _getLocalMainCategories(roomId);
     }
     final List<dynamic> decoded = jsonDecode(jsonStr);
     return decoded
@@ -211,38 +170,28 @@ class FirestoreCategoryRepository implements CategoryRepository {
       ..sort((a, b) => a.order.compareTo(b.order));
   }
 
-  Future<void> _saveLocalMainCategory(String userId, MainCategory category) async {
-    final key = 'local_main_categories_$userId';
-    final list = await _getLocalMainCategories(userId);
+  Future<void> _saveLocalMainCategory(String roomId, MainCategory category) async {
+    final key = 'local_main_categories_';
+    final list = await _getLocalMainCategories(roomId);
     final index = list.indexWhere((c) => c.id == category.id);
-    if (index >= 0) {
-      list[index] = category;
-    } else {
-      list.add(category);
-    }
-    final encoded = jsonEncode(list.map((c) => c.toMap()).toList());
-    await _prefs.setString(key, encoded);
+    if (index >= 0) { list[index] = category; } else { list.add(category); }
+    await _prefs.setString(key, jsonEncode(list.map((c) => c.toMap()).toList()));
   }
 
-  Future<void> _deleteLocalMainCategory(String userId, String categoryId) async {
-    final key = 'local_main_categories_$userId';
-    final list = await _getLocalMainCategories(userId);
+  Future<void> _deleteLocalMainCategory(String roomId, String categoryId) async {
+    final key = 'local_main_categories_';
+    final list = await _getLocalMainCategories(roomId);
     list.removeWhere((c) => c.id == categoryId);
-    final encoded = jsonEncode(list.map((c) => c.toMap()).toList());
-    await _prefs.setString(key, encoded);
-
-    // Cascade delete sub categories locally
-    final subCats = await _getLocalSubCategories(userId);
+    await _prefs.setString(key, jsonEncode(list.map((c) => c.toMap()).toList()));
+    final subCats = await _getLocalSubCategories(roomId);
     final updatedSubs = subCats.where((sub) => sub.mainCategoryId != categoryId).toList();
-    await _saveLocalSubCategoriesList(userId, updatedSubs);
+    await _prefs.setString('local_sub_categories_', jsonEncode(updatedSubs.map((c) => c.toMap()).toList()));
   }
 
-  Future<List<SubCategory>> _getLocalSubCategories(String userId) async {
-    final key = 'local_sub_categories_$userId';
+  Future<List<SubCategory>> _getLocalSubCategories(String roomId) async {
+    final key = 'local_sub_categories_';
     final jsonStr = _prefs.getString(key);
-    if (jsonStr == null) {
-      return [];
-    }
+    if (jsonStr == null) return [];
     final List<dynamic> decoded = jsonDecode(jsonStr);
     return decoded
         .map((item) => SubCategory.fromMap(item as Map<String, dynamic>, item['id'] ?? ''))
@@ -250,30 +199,18 @@ class FirestoreCategoryRepository implements CategoryRepository {
       ..sort((a, b) => a.order.compareTo(b.order));
   }
 
-  Future<void> _saveLocalSubCategory(String userId, SubCategory category) async {
-    final key = 'local_sub_categories_$userId';
-    final list = await _getLocalSubCategories(userId);
+  Future<void> _saveLocalSubCategory(String roomId, SubCategory category) async {
+    final key = 'local_sub_categories_';
+    final list = await _getLocalSubCategories(roomId);
     final index = list.indexWhere((c) => c.id == category.id);
-    if (index >= 0) {
-      list[index] = category;
-    } else {
-      list.add(category);
-    }
-    final encoded = jsonEncode(list.map((c) => c.toMap()).toList());
-    await _prefs.setString(key, encoded);
+    if (index >= 0) { list[index] = category; } else { list.add(category); }
+    await _prefs.setString(key, jsonEncode(list.map((c) => c.toMap()).toList()));
   }
 
-  Future<void> _deleteLocalSubCategory(String userId, String subCategoryId) async {
-    final key = 'local_sub_categories_$userId';
-    final list = await _getLocalSubCategories(userId);
+  Future<void> _deleteLocalSubCategory(String roomId, String subCategoryId) async {
+    final key = 'local_sub_categories_';
+    final list = await _getLocalSubCategories(roomId);
     list.removeWhere((c) => c.id == subCategoryId);
-    final encoded = jsonEncode(list.map((c) => c.toMap()).toList());
-    await _prefs.setString(key, encoded);
-  }
-
-  Future<void> _saveLocalSubCategoriesList(String userId, List<SubCategory> list) async {
-    final key = 'local_sub_categories_$userId';
-    final encoded = jsonEncode(list.map((c) => c.toMap()).toList());
-    await _prefs.setString(key, encoded);
+    await _prefs.setString(key, jsonEncode(list.map((c) => c.toMap()).toList()));
   }
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/common/custom_button.dart';
@@ -17,6 +17,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _googleLoading = false;
 
   @override
   void dispose() {
@@ -34,12 +35,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _signInWithGoogle() async {
+    setState(() => _googleLoading = true);
+    await ref.read(authNotifierProvider.notifier).signInWithGoogle();
+    if (mounted) setState(() => _googleLoading = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
     final theme = Theme.of(context);
 
-    // Listen to authentication errors
     ref.listen<AuthState>(authNotifierProvider, (previous, next) {
       if (next.status == AuthStatus.error && next.errorMessage != null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -62,7 +68,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo/Header (ถุงเงินคู่รัก Pink Theme)
+                  // Logo
                   Stack(
                     alignment: Alignment.center,
                     children: [
@@ -88,15 +94,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ],
                         ),
                       ),
-                      const Text(
-                        '💰',
-                        style: TextStyle(fontSize: 48),
-                      ),
+                      const Text('🐷', style: TextStyle(fontSize: 48)),
                     ],
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'ถุงเงินคู่รัก',
+                    'Kapookluxx',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.displayMedium?.copyWith(
                       fontSize: 32,
@@ -106,7 +109,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'บันทึกรายรับ-รายจ่ายร่วมกันสำหรับคู่รัก',
+                    'บันทึกรายรับ-รายจ่ายร่วมกันสำหรับคู่รัก 💕',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
@@ -114,6 +117,52 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 36),
+
+                  // Google Sign-In Button
+                  OutlinedButton.icon(
+                    onPressed: (_googleLoading || authState.status == AuthStatus.loading)
+                        ? null
+                        : _signInWithGoogle,
+                    icon: _googleLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Image.network(
+                            'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
+                            width: 20,
+                            height: 20,
+                            errorBuilder: (_, __, ___) =>
+                                const Icon(Icons.login, size: 20),
+                          ),
+                    label: const Text('เข้าสู่ระบบด้วย Google'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Divider
+                  Row(
+                    children: [
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'หรือ',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface.withOpacity(0.4),
+                          ),
+                        ),
+                      ),
+                      const Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
                   // Email
                   CustomTextField(
@@ -155,7 +204,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   // Sign In Button
                   CustomButton(
                     text: 'เข้าสู่ระบบ',
-                    isLoading: authState.status == AuthStatus.loading,
+                    isLoading: authState.status == AuthStatus.loading && !_googleLoading,
                     onPressed: _submit,
                   ),
                   const SizedBox(height: 16),
@@ -166,7 +215,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ref.read(authNotifierProvider.notifier).loginAsGuest();
                     },
                     icon: const Icon(Icons.person_outline),
-                    label: const Text('เข้าใช้งานแบบเกสต์ (ทดลองใช้ทันที)'),
+                    label: const Text('เข้าใช้งานแบบทดลอง (ไม่บันทึกข้อมูล)'),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
@@ -185,7 +234,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                            MaterialPageRoute(
+                                builder: (context) => const RegisterScreen()),
                           );
                         },
                         child: Text(

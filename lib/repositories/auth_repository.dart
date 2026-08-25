@@ -1,5 +1,6 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 
 abstract class AuthRepository {
@@ -7,6 +8,7 @@ abstract class AuthRepository {
   String? get currentUserId;
   Future<String?> signInWithEmailAndPassword(String email, String password);
   Future<String?> signUpWithEmailAndPassword(String email, String password);
+  Future<String?> signInWithGoogle();
   Future<void> signOut();
   Future<void> loginAsGuest();
 }
@@ -30,7 +32,6 @@ class FirebaseAuthRepository implements AuthRepository {
 
     if (_useLocalMock) {
       _mockAuthStreamController = StreamController<String?>.broadcast();
-      // Emit initial value on next microtask
       scheduleMicrotask(() {
         if (!_mockAuthStreamController.isClosed) {
           _mockAuthStreamController.add(_prefs.getString('mock_userId'));
@@ -41,17 +42,13 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Stream<String?> get authStateChanges {
-    if (_useLocalMock) {
-      return _mockAuthStreamController.stream;
-    }
+    if (_useLocalMock) return _mockAuthStreamController.stream;
     return _firebaseAuth!.authStateChanges().map((user) => user?.uid);
   }
 
   @override
   String? get currentUserId {
-    if (_useLocalMock) {
-      return _prefs.getString('mock_userId');
-    }
+    if (_useLocalMock) return _prefs.getString('mock_userId');
     return _firebaseAuth!.currentUser?.uid;
   }
 
@@ -59,7 +56,7 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<String?> signInWithEmailAndPassword(String email, String password) async {
     if (_useLocalMock) {
       if (email.contains('@') && password.length >= 6) {
-        final mockId = 'mock_user_${email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
+        final mockId = 'mock_user_';
         await _prefs.setString('mock_userId', mockId);
         _mockAuthStreamController.add(mockId);
         return mockId;
@@ -75,7 +72,7 @@ class FirebaseAuthRepository implements AuthRepository {
     } on fb.FirebaseAuthException catch (e) {
       throw Exception(_translateFirebaseError(e.code));
     } catch (e) {
-      throw Exception('เกิดข้อผิดพลาด: ${e.toString()}');
+      throw Exception('เกิดข้อผิดพลาด: ');
     }
   }
 
@@ -83,7 +80,7 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<String?> signUpWithEmailAndPassword(String email, String password) async {
     if (_useLocalMock) {
       if (email.contains('@') && password.length >= 6) {
-        final mockId = 'mock_user_${email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
+        final mockId = 'mock_user_';
         await _prefs.setString('mock_userId', mockId);
         _mockAuthStreamController.add(mockId);
         return mockId;
@@ -99,7 +96,39 @@ class FirebaseAuthRepository implements AuthRepository {
     } on fb.FirebaseAuthException catch (e) {
       throw Exception(_translateFirebaseError(e.code));
     } catch (e) {
-      throw Exception('เกิดข้อผิดพลาด: ${e.toString()}');
+      throw Exception('เกิดข้อผิดพลาด: ');
+    }
+  }
+
+  @override
+  Future<String?> signInWithGoogle() async {
+    if (_useLocalMock) {
+      const mockId = 'mock_google_user';
+      await _prefs.setString('mock_userId', mockId);
+      _mockAuthStreamController.add(mockId);
+      return mockId;
+    }
+    try {
+      if (kIsWeb) {
+        // Use Firebase Auth popup for web
+        final provider = fb.GoogleAuthProvider();
+        provider.addScope('email');
+        provider.addScope('profile');
+        final result = await _firebaseAuth!.signInWithPopup(provider);
+        return result.user?.uid;
+      } else {
+        // Mobile: use google_sign_in package (for future APK)
+        // TODO: Add google_sign_in flow for Android/iOS
+        throw Exception('Google Sign-In บนมือถือจะรองรับใน Phase 4 (APK)');
+      }
+    } on fb.FirebaseAuthException catch (e) {
+      throw Exception(_translateFirebaseError(e.code));
+    } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('popup-closed-by-user') || msg.contains('cancelled')) {
+        throw Exception('ยกเลิกการเข้าสู่ระบบด้วย Google');
+      }
+      throw Exception('Google Sign-In ล้มเหลว: ');
     }
   }
 
@@ -122,10 +151,8 @@ class FirebaseAuthRepository implements AuthRepository {
     }
     try {
       final credential = await _firebaseAuth!.signInAnonymously();
-      // Tag it in prefs too
       await _prefs.setString('mock_userId', credential.user?.uid ?? 'guest_user');
     } catch (e) {
-      // Fallback to local mock guest if sign in anonymously fails
       await _prefs.setString('mock_userId', 'guest_user');
       _mockAuthStreamController.add('guest_user');
     }
@@ -137,6 +164,8 @@ class FirebaseAuthRepository implements AuthRepository {
         return 'ไม่พบบัญชีผู้ใช้นี้ในระบบ';
       case 'wrong-password':
         return 'รหัสผ่านไม่ถูกต้อง';
+      case 'invalid-credential':
+        return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
       case 'email-already-in-use':
         return 'อีเมลนี้ถูกใช้งานแล้วในระบบ';
       case 'invalid-email':
@@ -144,9 +173,11 @@ class FirebaseAuthRepository implements AuthRepository {
       case 'weak-password':
         return 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร';
       case 'operation-not-allowed':
-        return 'การเข้าสู่ระบบแบบไม่เปิดเผยตัวตนยังไม่เปิดใช้งาน';
+        return 'การเข้าสู่ระบบประเภทนี้ยังไม่เปิดใช้งาน';
+      case 'account-exists-with-different-credential':
+        return 'มีบัญชีนี้อยู่แล้วด้วยวิธีล็อกอินอื่น';
       default:
-        return 'เกิดข้อผิดพลาดเกี่ยวกับระบบสมาชิก ($code)';
+        return 'เกิดข้อผิดพลาดเกี่ยวกับระบบสมาชิก ()';
     }
   }
 }

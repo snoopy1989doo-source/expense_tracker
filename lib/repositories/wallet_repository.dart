@@ -1,14 +1,14 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../models/wallet.dart';
+import '../models/wallet.dart';
 import '../core/constants/default_categories.dart';
 
 abstract class WalletRepository {
-  Future<List<Wallet>> getWallets(String userId);
-  Future<void> saveWallet(String userId, Wallet wallet);
-  Future<void> deleteWallet(String userId, String walletId);
-  Future<void> seedDefaultWallets(String userId);
+  Future<List<Wallet>> getWallets(String roomId);
+  Future<void> saveWallet(String roomId, Wallet wallet);
+  Future<void> deleteWallet(String roomId, String walletId);
+  Future<void> seedDefaultWallets(String roomId);
 }
 
 class FirestoreWalletRepository implements WalletRepository {
@@ -29,69 +29,69 @@ class FirestoreWalletRepository implements WalletRepository {
   }
 
   @override
-  Future<List<Wallet>> getWallets(String userId) async {
-    if (_useLocalMock || userId == 'guest_user') {
-      return _getLocalWallets(userId);
+  Future<List<Wallet>> getWallets(String roomId) async {
+    if (_useLocalMock || roomId == 'guest_user') {
+      return _getLocalWallets(roomId);
     }
     try {
       final snapshot = await _firestore!
-          .collection('users')
-          .doc(userId)
+          .collection('couple_rooms')
+          .doc(roomId)
           .collection('wallets')
           .orderBy('createdAt')
           .get();
 
       if (snapshot.docs.isEmpty) {
-        await seedDefaultWallets(userId);
-        return getWallets(userId);
+        await seedDefaultWallets(roomId);
+        return getWallets(roomId);
       }
 
       return snapshot.docs
           .map((doc) => Wallet.fromMap(doc.data(), doc.id))
           .toList();
     } catch (e) {
-      return _getLocalWallets(userId);
+      return _getLocalWallets(roomId);
     }
   }
 
   @override
-  Future<void> saveWallet(String userId, Wallet wallet) async {
-    if (_useLocalMock || userId == 'guest_user') {
-      await _saveLocalWallet(userId, wallet);
+  Future<void> saveWallet(String roomId, Wallet wallet) async {
+    if (_useLocalMock || roomId == 'guest_user') {
+      await _saveLocalWallet(roomId, wallet);
       return;
     }
     try {
       await _firestore!
-          .collection('users')
-          .doc(userId)
+          .collection('couple_rooms')
+          .doc(roomId)
           .collection('wallets')
           .doc(wallet.id)
           .set(wallet.toMap(), SetOptions(merge: true));
     } catch (e) {
-      await _saveLocalWallet(userId, wallet);
+      await _saveLocalWallet(roomId, wallet);
     }
   }
 
   @override
-  Future<void> deleteWallet(String userId, String walletId) async {
-    if (_useLocalMock || userId == 'guest_user') {
-      await _deleteLocalWallet(userId, walletId);
+  Future<void> deleteWallet(String roomId, String walletId) async {
+    if (_useLocalMock || roomId == 'guest_user') {
+      await _deleteLocalWallet(roomId, walletId);
       return;
     }
     try {
       await _firestore!
-          .collection('users')
-          .doc(userId)
+          .collection('couple_rooms')
+          .doc(roomId)
           .collection('wallets')
           .doc(walletId)
           .delete();
     } catch (e) {
-      await _deleteLocalWallet(userId, walletId);
+      await _deleteLocalWallet(roomId, walletId);
     }
   }
 
   @override
-  Future<void> seedDefaultWallets(String userId) async {
+  Future<void> seedDefaultWallets(String roomId) async {
     for (var wData in DefaultCategoriesData.defaultWallets) {
       final wallet = Wallet(
         id: wData['id'],
@@ -102,18 +102,18 @@ class FirestoreWalletRepository implements WalletRepository {
         currentBalance: wData['startingBalance'],
         createdAt: DateTime.now(),
       );
-      await saveWallet(userId, wallet);
+      await saveWallet(roomId, wallet);
     }
   }
 
   // --- Local Storage Helpers ---
 
-  Future<List<Wallet>> _getLocalWallets(String userId) async {
-    final key = 'local_wallets_$userId';
+  Future<List<Wallet>> _getLocalWallets(String roomId) async {
+    final key = 'local_wallets_';
     final jsonStr = _prefs.getString(key);
     if (jsonStr == null) {
-      await seedDefaultWallets(userId);
-      return _getLocalWallets(userId);
+      await seedDefaultWallets(roomId);
+      return _getLocalWallets(roomId);
     }
     final List<dynamic> decoded = jsonDecode(jsonStr);
     return decoded
@@ -122,9 +122,9 @@ class FirestoreWalletRepository implements WalletRepository {
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   }
 
-  Future<void> _saveLocalWallet(String userId, Wallet wallet) async {
-    final key = 'local_wallets_$userId';
-    final list = await _getLocalWallets(userId);
+  Future<void> _saveLocalWallet(String roomId, Wallet wallet) async {
+    final key = 'local_wallets_';
+    final list = await _getLocalWallets(roomId);
     final index = list.indexWhere((w) => w.id == wallet.id);
     if (index >= 0) {
       list[index] = wallet;
@@ -135,9 +135,9 @@ class FirestoreWalletRepository implements WalletRepository {
     await _prefs.setString(key, encoded);
   }
 
-  Future<void> _deleteLocalWallet(String userId, String walletId) async {
-    final key = 'local_wallets_$userId';
-    final list = await _getLocalWallets(userId);
+  Future<void> _deleteLocalWallet(String roomId, String walletId) async {
+    final key = 'local_wallets_';
+    final list = await _getLocalWallets(roomId);
     list.removeWhere((w) => w.id == walletId);
     final encoded = jsonEncode(list.map((w) => w.toMap()).toList());
     await _prefs.setString(key, encoded);
