@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -56,7 +56,7 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<String?> signInWithEmailAndPassword(String email, String password) async {
     if (_useLocalMock) {
       if (email.contains('@') && password.length >= 6) {
-        final mockId = 'mock_user_';
+        final mockId = 'mock_user_${email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
         await _prefs.setString('mock_userId', mockId);
         _mockAuthStreamController.add(mockId);
         return mockId;
@@ -72,7 +72,7 @@ class FirebaseAuthRepository implements AuthRepository {
     } on fb.FirebaseAuthException catch (e) {
       throw Exception(_translateFirebaseError(e.code));
     } catch (e) {
-      throw Exception('เกิดข้อผิดพลาด: ');
+      throw Exception('เกิดข้อผิดพลาด: ${e.toString()}');
     }
   }
 
@@ -80,7 +80,7 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<String?> signUpWithEmailAndPassword(String email, String password) async {
     if (_useLocalMock) {
       if (email.contains('@') && password.length >= 6) {
-        final mockId = 'mock_user_';
+        final mockId = 'mock_user_${email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
         await _prefs.setString('mock_userId', mockId);
         _mockAuthStreamController.add(mockId);
         return mockId;
@@ -96,7 +96,7 @@ class FirebaseAuthRepository implements AuthRepository {
     } on fb.FirebaseAuthException catch (e) {
       throw Exception(_translateFirebaseError(e.code));
     } catch (e) {
-      throw Exception('เกิดข้อผิดพลาด: ');
+      throw Exception('เกิดข้อผิดพลาด: ${e.toString()}');
     }
   }
 
@@ -118,7 +118,6 @@ class FirebaseAuthRepository implements AuthRepository {
         return result.user?.uid;
       } else {
         // Mobile: use google_sign_in package (for future APK)
-        // TODO: Add google_sign_in flow for Android/iOS
         throw Exception('Google Sign-In บนมือถือจะรองรับใน Phase 4 (APK)');
       }
     } on fb.FirebaseAuthException catch (e) {
@@ -128,7 +127,7 @@ class FirebaseAuthRepository implements AuthRepository {
       if (msg.contains('popup-closed-by-user') || msg.contains('cancelled')) {
         throw Exception('ยกเลิกการเข้าสู่ระบบด้วย Google');
       }
-      throw Exception('Google Sign-In ล้มเหลว: ');
+      throw Exception('Google Sign-In ล้มเหลว: $msg');
     }
   }
 
@@ -174,10 +173,12 @@ class FirebaseAuthRepository implements AuthRepository {
         return 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร';
       case 'operation-not-allowed':
         return 'การเข้าสู่ระบบประเภทนี้ยังไม่เปิดใช้งาน';
+      case 'unauthorized-domain':
+        return 'โดเมนนี้ยังไม่ได้รับอนุญาตใน Firebase Console (กรุณาเพิ่ม Authorized Domain)';
       case 'account-exists-with-different-credential':
         return 'มีบัญชีนี้อยู่แล้วด้วยวิธีล็อกอินอื่น';
       default:
-        return 'เกิดข้อผิดพลาดเกี่ยวกับระบบสมาชิก ()';
+        return 'เกิดข้อผิดพลาดเกี่ยวกับระบบสมาชิก ($code)';
     }
   }
 }
