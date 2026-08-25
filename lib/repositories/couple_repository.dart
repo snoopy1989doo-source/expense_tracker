@@ -1,4 +1,4 @@
-﻿import 'dart:math';
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/couple_room.dart';
 
@@ -46,47 +46,65 @@ class CoupleRepository {
       },
     );
 
-    await batch.commit();
-    return room;
+    try {
+      await batch.commit();
+      return room;
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        throw Exception(
+            'สิทธิ์การใช้งานถูกปฏิเสธ: กรุณาตั้งค่า Firestore Rules ใน Firebase Console ตามขั้นตอนที่แจ้งไว้ครับ');
+      }
+      throw Exception('ไม่สามารถสร้างห้องได้ (${e.code}): ${e.message}');
+    } catch (e) {
+      throw Exception('ไม่สามารถสร้างห้องได้: ${e.toString()}');
+    }
   }
 
   /// Join an existing couple room via invite code
   Future<CoupleRoom> joinCoupleRoom(String inviteCode, String userId) async {
     if (!_isAvailable) throw Exception('Firebase ไม่พร้อมใช้งาน');
 
-    // Look up invite code
-    final codeDoc = await _firestore!
-        .collection('invite_codes')
-        .doc(inviteCode.toUpperCase())
-        .get();
+    try {
+      // Look up invite code
+      final codeDoc = await _firestore!
+          .collection('invite_codes')
+          .doc(inviteCode.toUpperCase())
+          .get();
 
-    if (!codeDoc.exists) throw Exception('ไม่พบโค้ดนี้ในระบบ กรุณาตรวจสอบอีกครั้ง');
+      if (!codeDoc.exists) throw Exception('ไม่พบโค้ดนี้ในระบบ กรุณาตรวจสอบอีกครั้ง');
 
-    final roomId = codeDoc.data()!['roomId'] as String;
+      final roomId = codeDoc.data()!['roomId'] as String;
 
-    // Get the room
-    final roomDoc = await _firestore.collection('couple_rooms').doc(roomId).get();
-    if (!roomDoc.exists) throw Exception('ไม่พบห้องคู่รัก กรุณาติดต่อผู้สร้างห้อง');
+      // Get the room
+      final roomDoc = await _firestore!.collection('couple_rooms').doc(roomId).get();
+      if (!roomDoc.exists) throw Exception('ไม่พบห้องคู่รัก กรุณาติดต่อผู้สร้างห้อง');
 
-    final room = CoupleRoom.fromMap(roomDoc.data()!, roomDoc.id);
+      final room = CoupleRoom.fromMap(roomDoc.data()!, roomDoc.id);
 
-    if (room.isFull && !room.memberIds.contains(userId)) {
-      throw Exception('ห้องนี้มีสมาชิกครบแล้ว (2 คน)');
+      if (room.isFull && !room.memberIds.contains(userId)) {
+        throw Exception('ห้องนี้มีสมาชิกครบแล้ว (2 คน)');
+      }
+
+      if (!room.memberIds.contains(userId)) {
+        // Add this user to the room
+        await _firestore!.collection('couple_rooms').doc(roomId).update({
+          'memberIds': FieldValue.arrayUnion([userId]),
+        });
+      }
+
+      // Delete invite code after joining (one-time use)
+      await _firestore!.collection('invite_codes').doc(inviteCode.toUpperCase()).delete();
+
+      // Return updated room
+      final updatedDoc = await _firestore!.collection('couple_rooms').doc(roomId).get();
+      return CoupleRoom.fromMap(updatedDoc.data()!, updatedDoc.id);
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        throw Exception(
+            'สิทธิ์การใช้งานถูกปฏิเสธ: กรุณาตั้งค่า Firestore Rules ใน Firebase Console ตามขั้นตอนที่แจ้งไว้ครับ');
+      }
+      throw Exception('ไม่สามารถเข้าร่วมห้องได้ (${e.code}): ${e.message}');
     }
-
-    if (!room.memberIds.contains(userId)) {
-      // Add this user to the room
-      await _firestore.collection('couple_rooms').doc(roomId).update({
-        'memberIds': FieldValue.arrayUnion([userId]),
-      });
-    }
-
-    // Delete invite code after joining (one-time use)
-    await _firestore.collection('invite_codes').doc(inviteCode.toUpperCase()).delete();
-
-    // Return updated room
-    final updatedDoc = await _firestore.collection('couple_rooms').doc(roomId).get();
-    return CoupleRoom.fromMap(updatedDoc.data()!, updatedDoc.id);
   }
 
   /// Stream of couple room (real-time updates)
