@@ -1,4 +1,4 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_profile.dart';
 
 class UserProfileRepository {
@@ -30,13 +30,13 @@ class UserProfileRepository {
         .set(profile.toMap(), SetOptions(merge: true));
   }
 
-  /// Update only coupleRoomId
+  /// Update only coupleRoomId (creates profile document if not exists)
   Future<void> setCoupleRoomId(String userId, String coupleRoomId) async {
     if (!_isAvailable) return;
     await _firestore!
         .collection('users')
         .doc(userId)
-        .update({'coupleRoomId': coupleRoomId});
+        .set({'coupleRoomId': coupleRoomId}, SetOptions(merge: true));
   }
 
   /// Get a user profile once (not streaming)
