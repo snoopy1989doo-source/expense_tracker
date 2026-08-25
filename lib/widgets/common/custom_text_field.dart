@@ -5,6 +5,8 @@ class CustomTextField extends StatelessWidget {
   final String labelText;
   final String? hintText;
   final IconData? prefixIcon;
+  final Widget? prefixWidget;
+  final String? prefixText;
   final Widget? suffixIcon;
   final bool obscureText;
   final TextInputType keyboardType;
@@ -20,6 +22,8 @@ class CustomTextField extends StatelessWidget {
     required this.labelText,
     this.hintText,
     this.prefixIcon,
+    this.prefixWidget,
+    this.prefixText,
     this.suffixIcon,
     this.obscureText = false,
     this.keyboardType = TextInputType.text,
@@ -44,7 +48,8 @@ class CustomTextField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: labelText,
         hintText: hintText,
-        prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 22) : null,
+        prefixIcon: prefixWidget ?? (prefixIcon != null ? Icon(prefixIcon, size: 22) : null),
+        prefixText: prefixText,
         suffixIcon: suffixIcon,
       ),
     );

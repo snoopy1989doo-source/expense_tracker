@@ -336,7 +336,19 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                       controller: _amountController,
                       labelText: 'จำนวนเงิน (บาท)',
                       hintText: '0.00',
-                      prefixIcon: Icons.attach_money,
+                      prefixWidget: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '฿',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       validator: (val) {
                         if (val == null || val.trim().isEmpty) return 'กรุณากรอกจำนวนเงิน';

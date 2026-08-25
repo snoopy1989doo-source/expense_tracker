@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/couple_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/onboarding_provider.dart';
 import '../category/category_management_screen.dart';
 import '../wallet/wallet_management_screen.dart';
+import '../couple/couple_setup_screen.dart';
 import '../../widgets/common/confirm_dialog.dart';
 import '../../core/constants/app_colors.dart';
 
@@ -18,10 +21,12 @@ class SettingsScreen extends ConsumerWidget {
     final themeNotifier = ref.read(themeProvider.notifier);
     final authNotifier = ref.read(authNotifierProvider.notifier);
     final authState = ref.watch(authNotifierProvider);
+    final coupleRoomId = ref.watch(coupleRoomIdProvider);
+    final coupleRoomAsync = ref.watch(coupleRoomProvider);
 
     final theme = Theme.of(context);
 
-    void _confirmResetCategories() {
+    void confirmResetCategories() {
       ConfirmDialog.show(
         context,
         title: 'รีเซ็ตหมวดหมู่เริ่มต้น',
@@ -30,12 +35,14 @@ class SettingsScreen extends ConsumerWidget {
         confirmColor: AppColors.primary,
         onConfirm: () async {
           await ref.read(mainCategoriesProvider.notifier).resetToDefault();
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('รีเซ็ตหมวดหมู่สำเร็จแล้ว')));
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('รีเซ็ตหมวดหมู่สำเร็จแล้ว')));
+          }
         },
       );
     }
 
-    void _confirmResetOnboarding() {
+    void confirmResetOnboarding() {
       ConfirmDialog.show(
         context,
         title: 'จำลอง Onboarding ใหม่',
@@ -49,7 +56,7 @@ class SettingsScreen extends ConsumerWidget {
       );
     }
 
-    void _confirmLogout() {
+    void confirmLogout() {
       ConfirmDialog.show(
         context,
         title: 'ออกจากระบบ',
@@ -69,6 +76,61 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
         children: [
+          // Couple Room Management Section (💕)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.primary.withOpacity(0.08),
+                  theme.colorScheme.primary.withOpacity(0.02),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.3)),
+            ),
+            child: ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: AppColors.primary,
+                child: Text('💕', style: TextStyle(fontSize: 18)),
+              ),
+              title: Text(
+                coupleRoomId != null ? 'ห้องคู่รัก (Kapookluxx Room)' : 'เชื่อมต่อกับแฟน (ห้องคู่รัก)',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: coupleRoomAsync.when(
+                data: (room) {
+                  if (room == null) {
+                    return const Text('สร้างห้องใหม่ หรือกรอกโค้ดเพื่อเริ่มบันทึกเงินร่วมกัน');
+                  }
+                  final memberCount = room.memberIds.length;
+                  return Text('รหัสเชิญแฟน: ${room.inviteCode} (${memberCount}/2 คน)');
+                },
+                loading: () => const Text('กำลังโหลดข้อมูลห้องคู่รัก...'),
+                error: (_, __) => const Text('กดเพื่อสร้างหรือเชื่อมต่อห้องคู่รัก'),
+              ),
+              trailing: coupleRoomAsync.value?.inviteCode != null
+                  ? IconButton(
+                      icon: const Icon(Icons.copy, color: AppColors.primary),
+                      tooltip: 'คัดลอกโค้ดเชิญ',
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: coupleRoomAsync.value!.inviteCode));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('คัดลอกโค้ดเชิญแล้ว: ${coupleRoomAsync.value!.inviteCode}')),
+                        );
+                      },
+                    )
+                  : const Icon(Icons.chevron_right, color: AppColors.primary),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CoupleSetupScreen()),
+                );
+              },
+            ),
+          ),
+          const Divider(),
+
           // Theme selection
           ListTile(
             leading: Icon(isDark ? Icons.dark_mode : Icons.light_mode, color: theme.colorScheme.primary),
@@ -113,13 +175,13 @@ class SettingsScreen extends ConsumerWidget {
             leading: const Icon(Icons.refresh, color: AppColors.primary),
             title: const Text('รีเซ็ตหมวดหมู่เริ่มต้น', style: TextStyle(fontWeight: FontWeight.bold)),
             subtitle: const Text('ย้อนโครงสร้างหมวดหมู่กลับเป็นค่าเริ่มต้นตามที่แนะนำในระบบ'),
-            onTap: _confirmResetCategories,
+            onTap: confirmResetCategories,
           ),
           ListTile(
             leading: const Icon(Icons.assignment_ind_outlined, color: AppColors.primary),
             title: const Text('เริ่มขั้นตอน Onboarding ใหม่', style: TextStyle(fontWeight: FontWeight.bold)),
             subtitle: const Text('กลับไปตอบคำถามแนะนำตั้งต้นกระเป๋าเงินและหมวดหมู่อีกครั้ง'),
-            onTap: _confirmResetOnboarding,
+            onTap: confirmResetOnboarding,
           ),
           const Divider(),
 
@@ -139,7 +201,7 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.exit_to_app, color: AppColors.expense),
             title: const Text('ออกจากระบบ', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.expense)),
-            onTap: _confirmLogout,
+            onTap: confirmLogout,
           ),
         ],
       ),
