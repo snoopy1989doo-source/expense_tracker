@@ -129,11 +129,43 @@ class CoupleRepository {
     }, SetOptions(merge: true));
   }
 
+  /// Remove custom food item from room
+  Future<void> removeCustomFoodFromRoom(String roomId, Map<String, String> foodItem) async {
+    if (!_isAvailable) return;
+    await _firestore!.collection('couple_rooms').doc(roomId).set({
+      'customFoodMenu': FieldValue.arrayRemove([foodItem]),
+    }, SetOptions(merge: true));
+  }
+
+  /// Update custom food menu array in room
+  Future<void> updateCustomFoodMenu(String roomId, List<Map<String, String>> foodMenu) async {
+    if (!_isAvailable) return;
+    await _firestore!.collection('couple_rooms').doc(roomId).set({
+      'customFoodMenu': foodMenu,
+    }, SetOptions(merge: true));
+  }
+
   /// Add custom quest item to room
   Future<void> addCustomQuestToRoom(String roomId, Map<String, String> questItem) async {
     if (!_isAvailable) return;
     await _firestore!.collection('couple_rooms').doc(roomId).set({
       'customQuests': FieldValue.arrayUnion([questItem]),
+    }, SetOptions(merge: true));
+  }
+
+  /// Remove custom quest item from room
+  Future<void> removeCustomQuestFromRoom(String roomId, Map<String, String> questItem) async {
+    if (!_isAvailable) return;
+    await _firestore!.collection('couple_rooms').doc(roomId).set({
+      'customQuests': FieldValue.arrayRemove([questItem]),
+    }, SetOptions(merge: true));
+  }
+
+  /// Update custom quests array in room
+  Future<void> updateCustomQuests(String roomId, List<Map<String, String>> quests) async {
+    if (!_isAvailable) return;
+    await _firestore!.collection('couple_rooms').doc(roomId).set({
+      'customQuests': quests,
     }, SetOptions(merge: true));
   }
 }

@@ -111,13 +111,193 @@ class _FoodDecisionWheelDialogState extends ConsumerState<FoodDecisionWheelDialo
                 if (ctx.mounted) Navigator.of(ctx).pop();
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('✨ เพิ่มเมนู "$emoji $name" เข้า Firebase และแสดงทั้งคุณและแฟนเรียบร้อยแล้ว!')),
+                    SnackBar(content: Text('✨ เพิ่มเมนู "$emoji $name" เข้าวงล้อสำเร็จ!')),
                   );
                 }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
             child: const Text('บันทึกเมนู'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _manageFoodMenuBottomSheet(List<Map<String, String>> activeMenu) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final coupleRoom = ref.watch(coupleRoomProvider).value;
+          final currentCustom = [
+            ..._localCustomMenu,
+            if (coupleRoom != null) ...coupleRoom.customFoodMenu,
+          ];
+
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.75,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.restaurant_menu, color: AppColors.primary),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          '📋 จัดการ & ตรวจสอบเมนูอาหารทั้งหมด',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: activeMenu.length,
+                    itemBuilder: (context, index) {
+                      final food = activeMenu[index];
+                      final isDefault = _defaultFoodMenu.any((d) => d['name'] == food['name']);
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        child: ListTile(
+                          leading: Text(food['emoji'] ?? '🍱', style: const TextStyle(fontSize: 24)),
+                          title: Text(food['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          subtitle: Text(
+                            isDefault ? 'เมนูเริ่มต้นของระบบ' : 'เมนูพิเศษคู่รักของคุณ (ซิงก์ Firebase)',
+                            style: TextStyle(fontSize: 11, color: isDefault ? Colors.grey : AppColors.primary),
+                          ),
+                          trailing: isDefault
+                              ? null
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                                      onPressed: () {
+                                        _editFoodDialog(food, coupleRoom?.id);
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: AppColors.expense, size: 20),
+                                      onPressed: () async {
+                                        final roomId = ref.read(coupleRoomIdProvider);
+                                        if (roomId != null) {
+                                          await ref.read(coupleRepositoryProvider).removeCustomFoodFromRoom(roomId, food);
+                                        }
+                                        setState(() {
+                                          _localCustomMenu.removeWhere((item) => item['name'] == food['name']);
+                                        });
+                                        setSheetState(() {});
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('🗑️ ลบเมนู "${food['name']}" สำเร็จ')),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _addCustomFoodDialog();
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('➕ เพิ่มเมนูใหม่'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 46),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _editFoodDialog(Map<String, String> oldFood, String? roomId) {
+    final nameController = TextEditingController(text: oldFood['name']);
+    final emojiController = TextEditingController(text: oldFood['emoji']);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('✏️ แก้ไขเมนูอาหาร', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'ชื่อเมนูอาหาร'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: emojiController,
+              decoration: const InputDecoration(labelText: 'Emoji'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = nameController.text.trim();
+              final newEmoji = emojiController.text.trim().isEmpty ? '🍱' : emojiController.text.trim();
+
+              if (newName.isNotEmpty) {
+                final newItem = {'name': newName, 'emoji': newEmoji};
+                if (roomId != null) {
+                  await ref.read(coupleRepositoryProvider).removeCustomFoodFromRoom(roomId, oldFood);
+                  await ref.read(coupleRepositoryProvider).addCustomFoodToRoom(roomId, newItem);
+                }
+                setState(() {
+                  _localCustomMenu.removeWhere((item) => item['name'] == oldFood['name']);
+                  _localCustomMenu.add(newItem);
+                });
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('✨ แก้ไขเมนูเป็น "$newEmoji $newName" สำเร็จ!')),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            child: const Text('บันทึกการแก้ไข'),
           ),
         ],
       ),
@@ -305,10 +485,20 @@ class _FoodDecisionWheelDialogState extends ConsumerState<FoodDecisionWheelDialo
               ],
             ),
             const SizedBox(height: 10),
-            TextButton.icon(
-              onPressed: _isSpinning ? null : _addCustomFoodDialog,
-              icon: const Icon(Icons.add, size: 16),
-              label: Text('➕ เพิ่มเมนูโปรดของคุณ (${activeMenu.length} เมนูในวงล้อ)', style: const TextStyle(fontSize: 12)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: _isSpinning ? null : _addCustomFoodDialog,
+                  icon: const Icon(Icons.add, size: 14),
+                  label: Text('➕ เพิ่มเมนู', style: const TextStyle(fontSize: 11)),
+                ),
+                TextButton.icon(
+                  onPressed: _isSpinning ? null : () => _manageFoodMenuBottomSheet(activeMenu),
+                  icon: const Icon(Icons.list_alt, size: 14),
+                  label: Text('📋 ดู/แก้ไข/ลบเมนู (${activeMenu.length})', style: const TextStyle(fontSize: 11)),
+                ),
+              ],
             ),
           ],
         ),
