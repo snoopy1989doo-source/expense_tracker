@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/transaction_item.dart';
@@ -39,6 +41,17 @@ class TransactionTile extends ConsumerWidget {
         : (transaction.createdByName != null && transaction.createdByName!.isNotEmpty
             ? transaction.createdByName!
             : null);
+
+    Uint8List? avatarBytes;
+    final photoStr = (userProfile != null && transaction.createdByUserId == userProfile.id)
+        ? userProfile.photoBase64
+        : transaction.createdByPhoto;
+
+    if (photoStr != null && photoStr.startsWith('data:image')) {
+      try {
+        avatarBytes = base64Decode(photoStr.split(',').last);
+      } catch (_) {}
+    }
 
     return Card(
       child: ListTile(
@@ -114,8 +127,13 @@ class TransactionTile extends ConsumerWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.person, size: 10, color: AppColors.primary),
-                          const SizedBox(width: 2),
+                          avatarBytes != null
+                              ? CircleAvatar(
+                                  radius: 6,
+                                  backgroundImage: MemoryImage(avatarBytes),
+                                )
+                              : const Icon(Icons.person, size: 10, color: AppColors.primary),
+                          const SizedBox(width: 4),
                           Text(
                             displayCreatorName,
                             style: TextStyle(

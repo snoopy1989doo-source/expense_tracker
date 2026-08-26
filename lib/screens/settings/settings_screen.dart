@@ -1,6 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
@@ -14,34 +17,129 @@ import '../couple/couple_setup_screen.dart';
 import '../../widgets/common/confirm_dialog.dart';
 import '../../core/constants/app_colors.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(themeProvider);
-    final themeNotifier = ref.read(themeProvider.notifier);
-    final authNotifier = ref.read(authNotifierProvider.notifier);
-    final authState = ref.watch(authNotifierProvider);
-    final coupleRoomId = ref.watch(coupleRoomIdProvider);
-    final coupleRoomAsync = ref.watch(coupleRoomProvider);
-    final userProfile = ref.watch(userProfileProvider).value;
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
 
-    final theme = Theme.of(context);
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  final _picker = ImagePicker();
 
-    void editNicknameDialog() {
-      final nicknameController = TextEditingController(text: userProfile?.nickname ?? '');
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('✏️ แก้ไขชื่อผู้ใช้ในแอป (Nickname)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+  Future<void> _pickProfileImage(String currentNickname, UserProfile? userProfile, String userId) async {
+    try {
+      final pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+        maxWidth: 512,
+        maxHeight: 512,
+      );
+
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        final base64Str = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+
+        final profileRepo = ref.read(userProfileRepositoryProvider);
+        final updatedProfile = UserProfile(
+          id: userId,
+          email: userProfile?.email ?? '',
+          nickname: currentNickname.isNotEmpty ? currentNickname : (userProfile?.nickname ?? 'ผู้ใช้'),
+          photoBase64: base64Str,
+          coupleRoomId: userProfile?.coupleRoomId,
+          createdAt: userProfile?.createdAt ?? DateTime.now(),
+        );
+        await profileRepo.saveProfile(updatedProfile);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✨ อัปเดตรูปโปรไฟล์สำเร็จ!')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('แนบรูปโปรไฟล์ไม่สำเร็จ: $e')),
+        );
+      }
+    }
+  }
+
+  void _editProfileDialog(UserProfile? userProfile, String userId) {
+    final nicknameController = TextEditingController(text: userProfile?.nickname ?? '');
+    Uint8List? tempImageBytes;
+    String? tempBase64Str = userProfile?.photoBase64;
+
+    if (tempBase64Str != null && tempBase64Str.startsWith('data:image')) {
+      try {
+        tempImageBytes = base64Decode(tempBase64Str.split(',').last);
+      } catch (_) {}
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('✏️ แก้ไขข้อมูลโปรไฟล์', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Avatar Preview & Change Button
+              GestureDetector(
+                onTap: () async {
+                  final pickedFile = await _picker.pickImage(
+                    source: ImageSource.gallery,
+                    imageQuality: 70,
+                    maxWidth: 512,
+                    maxHeight: 512,
+                  );
+                  if (pickedFile != null) {
+                    final bytes = await pickedFile.readAsBytes();
+                    final base64Str = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                    setDialogState(() {
+                      tempImageBytes = bytes;
+                      tempBase64Str = base64Str;
+                    });
+                  }
+                },
+                child: Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    CircleAvatar(
+                      radius: 36,
+                      backgroundColor: AppColors.primary.withOpacity(0.12),
+                      backgroundImage: tempImageBytes != null
+                          ? MemoryImage(tempImageBytes!)
+                          : (tempBase64Str != null && tempBase64Str!.startsWith('http')
+                              ? NetworkImage(tempBase64Str!) as ImageProvider
+                              : null),
+                      child: (tempImageBytes == null && (tempBase64Str == null || !tempBase64Str!.startsWith('http')))
+                          ? Text(
+                              userProfile?.nickname?.isNotEmpty == true ? userProfile!.nickname.substring(0, 1) : '👤',
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 28),
+                            )
+                          : null,
+                    ),
+                    CircleAvatar(
+                      radius: 12,
+                      backgroundColor: AppColors.primary,
+                      child: const Icon(Icons.camera_alt, size: 12, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'กดที่รูปเพื่อเปลี่ยนรูปโปรไฟล์ 📸',
+                style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+              ),
+              const SizedBox(height: 16),
               TextField(
                 controller: nicknameController,
                 decoration: const InputDecoration(
-                  labelText: 'ชื่อเล่นของคุณในแอป (เช่น ยู, เมย์)',
+                  labelText: 'ชื่อเล่นของคุณในแอป',
                   hintText: 'กรอกชื่อเล่นที่ต้องการให้แสดงในสลิปและป้ายชื่อ',
                 ),
               ),
@@ -55,22 +153,22 @@ class SettingsScreen extends ConsumerWidget {
             ElevatedButton(
               onPressed: () async {
                 final newName = nicknameController.text.trim();
-                if (newName.isNotEmpty && authState.userId != null) {
+                if (newName.isNotEmpty) {
                   final profileRepo = ref.read(userProfileRepositoryProvider);
                   final updatedProfile = UserProfile(
-                    id: authState.userId!,
+                    id: userId,
                     email: userProfile?.email ?? '',
                     nickname: newName,
-                    photoBase64: userProfile?.photoBase64,
+                    photoBase64: tempBase64Str,
                     coupleRoomId: userProfile?.coupleRoomId,
                     createdAt: userProfile?.createdAt ?? DateTime.now(),
                   );
                   await profileRepo.saveProfile(updatedProfile);
-                  await ref.read(rawTransactionsProvider.notifier).updateCreatorNameForUser(authState.userId!, newName);
+                  await ref.read(rawTransactionsProvider.notifier).updateCreatorNameForUser(userId, newName);
                   if (ctx.mounted) Navigator.of(ctx).pop();
-                  if (context.mounted) {
+                  if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('✨ เปลี่ยนชื่อเล่นเป็น "$newName" สำเร็จ!')),
+                      SnackBar(content: Text('✨ อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว!')),
                     );
                   }
                 }
@@ -80,7 +178,29 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ],
         ),
-      );
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = ref.watch(themeProvider);
+    final themeNotifier = ref.read(themeProvider.notifier);
+    final authNotifier = ref.read(authNotifierProvider.notifier);
+    final authState = ref.watch(authNotifierProvider);
+    final coupleRoomId = ref.watch(coupleRoomIdProvider);
+    final coupleRoomAsync = ref.watch(coupleRoomProvider);
+    final userProfile = ref.watch(userProfileProvider).value;
+
+    final theme = Theme.of(context);
+    final userId = authState.userId ?? '';
+
+    Uint8List? profileImageBytes;
+    final photoUrl = userProfile?.photoBase64;
+    if (photoUrl != null && photoUrl.startsWith('data:image')) {
+      try {
+        profileImageBytes = base64Decode(photoUrl.split(',').last);
+      } catch (_) {}
     }
 
     void confirmResetCategories() {
@@ -133,7 +253,7 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
         children: [
-          // User Profile Card (👤 Nickname)
+          // User Profile Card (👤 Nickname & Profile Picture Attachment)
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             padding: const EdgeInsets.all(12),
@@ -144,12 +264,32 @@ class SettingsScreen extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: AppColors.primary.withOpacity(0.12),
-                  child: Text(
-                    userProfile?.nickname?.isNotEmpty == true ? userProfile!.nickname.substring(0, 1) : '👤',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 18),
+                GestureDetector(
+                  onTap: () => _pickProfileImage(userProfile?.nickname ?? '', userProfile, userId),
+                  child: Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor: AppColors.primary.withOpacity(0.12),
+                        backgroundImage: profileImageBytes != null
+                            ? MemoryImage(profileImageBytes)
+                            : (photoUrl != null && photoUrl.startsWith('http')
+                                ? NetworkImage(photoUrl) as ImageProvider
+                                : null),
+                        child: (profileImageBytes == null && (photoUrl == null || !photoUrl.startsWith('http')))
+                            ? Text(
+                                userProfile?.nickname?.isNotEmpty == true ? userProfile!.nickname.substring(0, 1) : '👤',
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 20),
+                              )
+                            : null,
+                      ),
+                      CircleAvatar(
+                        radius: 10,
+                        backgroundColor: AppColors.primary,
+                        child: const Icon(Icons.camera_alt, size: 10, color: Colors.white),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -178,8 +318,8 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 IconButton(
                   icon: const Icon(Icons.edit, color: AppColors.primary, size: 20),
-                  tooltip: 'แก้ไขชื่อเล่น',
-                  onPressed: editNicknameDialog,
+                  tooltip: 'แก้ไขชื่อและรูปโปรไฟล์',
+                  onPressed: () => _editProfileDialog(userProfile, userId),
                 ),
               ],
             ),
@@ -204,7 +344,7 @@ class SettingsScreen extends ConsumerWidget {
                 child: Text('💕', style: TextStyle(fontSize: 18)),
               ),
               title: Text(
-                coupleRoomId != null ? 'ห้องคู่รัก (Kapookluxx Room)' : 'เชื่อมต่อกับแฟน (ห้องคู่รัก)',
+                coupleRoomId != null ? 'ห้องคู่รัก' : 'เชื่อมต่อกับแฟน',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               subtitle: coupleRoomAsync.when(
@@ -243,7 +383,7 @@ class SettingsScreen extends ConsumerWidget {
           // Theme selection
           ListTile(
             leading: Icon(isDark ? Icons.dark_mode : Icons.light_mode, color: theme.colorScheme.primary),
-            title: const Text('โหมดมืด (Dark Mode)', style: TextStyle(fontWeight: FontWeight.bold)),
+            title: const Text('โหมดมืด', style: TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(isDark ? 'เปิดใช้งานโหมดมืด' : 'ปิดใช้งานโหมดมืด'),
             trailing: Switch(
               value: isDark,
@@ -288,7 +428,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
           ListTile(
             leading: const Icon(Icons.assignment_ind_outlined, color: AppColors.primary),
-            title: const Text('เริ่มขั้นตอน Onboarding ใหม่', style: TextStyle(fontWeight: FontWeight.bold)),
+            title: const Text('เริ่มขั้นตอนแนะนำเริ่มต้นใหม่', style: TextStyle(fontWeight: FontWeight.bold)),
             subtitle: const Text('กลับไปตอบคำถามแนะนำตั้งต้นกระเป๋าเงินและหมวดหมู่อีกครั้ง'),
             onTap: confirmResetOnboarding,
           ),
