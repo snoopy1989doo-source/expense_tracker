@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/transaction_item.dart';
 import '../../models/main_category.dart';
 import '../../models/sub_category.dart';
 import '../../models/wallet.dart';
+import '../../providers/auth_provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import 'receipt_preview_dialog.dart';
 
-class TransactionTile extends StatelessWidget {
+class TransactionTile extends ConsumerWidget {
   final TransactionItem transaction;
   final MainCategory? mainCategory;
   final SubCategory? subCategory;
@@ -25,11 +27,18 @@ class TransactionTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final userProfile = ref.watch(userProfileProvider).value;
     final isIncome = transaction.type == 'income';
     final amountColor = isIncome ? AppColors.income : AppColors.expense;
     final catColor = AppColors.fromHex(mainCategory?.color ?? '#9E9E9E');
+
+    final displayCreatorName = (userProfile != null && transaction.createdByUserId == userProfile.id && userProfile.nickname.isNotEmpty)
+        ? userProfile.nickname
+        : (transaction.createdByName != null && transaction.createdByName!.isNotEmpty
+            ? transaction.createdByName!
+            : null);
 
     return Card(
       child: ListTile(
@@ -94,7 +103,7 @@ class TransactionTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  if (transaction.createdByName != null && transaction.createdByName!.isNotEmpty) ...[
+                  if (displayCreatorName != null && displayCreatorName.isNotEmpty) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
@@ -108,7 +117,7 @@ class TransactionTile extends StatelessWidget {
                           const Icon(Icons.person, size: 10, color: AppColors.primary),
                           const SizedBox(width: 2),
                           Text(
-                            transaction.createdByName!,
+                            displayCreatorName,
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,

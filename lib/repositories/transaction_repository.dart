@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/transaction_item.dart';
@@ -7,6 +7,7 @@ abstract class TransactionRepository {
   Future<List<TransactionItem>> getTransactions(String roomId);
   Future<void> saveTransaction(String roomId, TransactionItem transaction);
   Future<void> deleteTransaction(String roomId, String transactionId);
+  Future<void> updateCreatorNameForUser(String roomId, String userId, String newName);
 }
 
 class FirestoreTransactionRepository implements TransactionRepository {
@@ -80,6 +81,42 @@ class FirestoreTransactionRepository implements TransactionRepository {
           .delete();
     } catch (e) {
       await _deleteLocalTransaction(roomId, transactionId);
+    }
+  }
+
+  @override
+  Future<void> updateCreatorNameForUser(String roomId, String userId, String newName) async {
+    if (_useLocalMock || roomId == 'guest_user') {
+      final list = await _getLocalTransactions(roomId);
+      bool changed = false;
+      for (int i = 0; i < list.length; i++) {
+        if (list[i].createdByUserId == userId) {
+          list[i] = list[i].copyWith(createdByName: newName);
+          changed = true;
+        }
+      }
+      if (changed) {
+        final key = 'local_transactions_';
+        final encoded = jsonEncode(list.map((t) => t.toMap()).toList());
+        await _prefs.setString(key, encoded);
+      }
+      return;
+    }
+    try {
+      final snap = await _firestore!
+          .collection('couple_rooms')
+          .doc(roomId)
+          .collection('transactions')
+          .where('createdByUserId', isEqualTo: userId)
+          .get();
+
+      final batch = _firestore!.batch();
+      for (var doc in snap.docs) {
+        batch.update(doc.reference, {'createdByName': newName});
+      }
+      await batch.commit();
+    } catch (e) {
+      // Fallback
     }
   }
 

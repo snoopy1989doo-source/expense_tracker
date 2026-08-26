@@ -5,6 +5,7 @@ import '../../providers/theme_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/transaction_provider.dart';
 import '../../providers/onboarding_provider.dart';
 import '../../models/user_profile.dart';
 import '../category/category_management_screen.dart';
@@ -65,6 +66,7 @@ class SettingsScreen extends ConsumerWidget {
                     createdAt: userProfile?.createdAt ?? DateTime.now(),
                   );
                   await profileRepo.saveProfile(updatedProfile);
+                  await ref.read(rawTransactionsProvider.notifier).updateCreatorNameForUser(authState.userId!, newName);
                   if (ctx.mounted) Navigator.of(ctx).pop();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(

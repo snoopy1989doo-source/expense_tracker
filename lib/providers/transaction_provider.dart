@@ -199,4 +199,10 @@ class RawTransactionsNotifier extends StateNotifier<List<TransactionItem>> {
     await _repository.deleteTransaction(_roomId, transactionId);
     await loadTransactions();
   }
+
+  Future<void> updateCreatorNameForUser(String userId, String newName) async {
+    if (_roomId == null) return;
+    await _repository.updateCreatorNameForUser(_roomId, userId, newName);
+    await loadTransactions();
+  }
 }
