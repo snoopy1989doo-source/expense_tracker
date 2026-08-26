@@ -9,6 +9,7 @@ class TransactionItem {
   final String subCategoryId;
   final String walletId;
   final String? note;
+  final String? loveNote;
   final String? receiptImageUrl;
   final bool isTaxDeductible;
   final String? createdByUserId;
@@ -26,6 +27,7 @@ class TransactionItem {
     required this.subCategoryId,
     required this.walletId,
     this.note,
+    this.loveNote,
     this.receiptImageUrl,
     required this.isTaxDeductible,
     this.createdByUserId,
@@ -44,6 +46,7 @@ class TransactionItem {
     String? subCategoryId,
     String? walletId,
     String? note,
+    String? loveNote,
     String? receiptImageUrl,
     bool? isTaxDeductible,
     String? createdByUserId,
@@ -61,6 +64,7 @@ class TransactionItem {
       subCategoryId: subCategoryId ?? this.subCategoryId,
       walletId: walletId ?? this.walletId,
       note: note ?? this.note,
+      loveNote: loveNote ?? this.loveNote,
       receiptImageUrl: receiptImageUrl ?? this.receiptImageUrl,
       isTaxDeductible: isTaxDeductible ?? this.isTaxDeductible,
       createdByUserId: createdByUserId ?? this.createdByUserId,
@@ -81,6 +85,7 @@ class TransactionItem {
       'subCategoryId': subCategoryId,
       'walletId': walletId,
       'note': note,
+      'loveNote': loveNote,
       'receiptImageUrl': receiptImageUrl,
       'isTaxDeductible': isTaxDeductible,
       'createdByUserId': createdByUserId,
@@ -103,6 +108,7 @@ class TransactionItem {
       subCategoryId: map['subCategoryId'] ?? '',
       walletId: map['walletId'] ?? '',
       note: map['note'],
+      loveNote: map['loveNote'] as String?,
       receiptImageUrl: map['receiptImageUrl'],
       isTaxDeductible: map['isTaxDeductible'] ?? false,
       createdByUserId: map['createdByUserId'] as String?,

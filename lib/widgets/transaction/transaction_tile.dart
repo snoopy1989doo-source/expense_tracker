@@ -143,6 +143,32 @@ class TransactionTile extends StatelessWidget {
                         ],
                       ),
                     ),
+                  if (transaction.loveNote != null && transaction.loveNote!.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.pink.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.pink.shade200, width: 0.8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.favorite, size: 10, color: AppColors.primary),
+                          const SizedBox(width: 2),
+                          Text(
+                            transaction.loveNote!,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   if (transaction.receiptImageUrl != null) ...[
                     const SizedBox(width: 8),
                     InkWell(

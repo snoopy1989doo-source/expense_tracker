@@ -11,6 +11,11 @@ import '../../widgets/common/empty_state.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../services/ai_finance_service.dart';
+import '../../widgets/ai/ai_chat_dialog.dart';
+import '../../widgets/couple/couple_quests_widget.dart';
+import '../../widgets/couple/food_decision_wheel_dialog.dart';
+import '../../models/transaction_item.dart';
 import '../transaction/add_edit_transaction_screen.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -168,7 +173,65 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
+
+                // AI Smart Insights & Predictor Card
+                _buildAIPredictorCard(context, ref, ref.watch(rawTransactionsProvider)),
+                const SizedBox(height: 16),
+
+                // Quick Couple Gimmick Buttons Row (AI Chat & Food Decision Wheel)
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => AIChatDialog.show(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.pink.shade50,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.auto_awesome, color: AppColors.primary, size: 18),
+                              SizedBox(width: 6),
+                              Text('ถาม AI การเงิน 🤖', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => FoodDecisionWheelDialog.show(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.orange.shade300),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.casino, color: Colors.orange, size: 18),
+                              SizedBox(width: 6),
+                              Text('เย็นนี้กินอะไรดี? 🎰', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Couple Quests & Horoscope Card
+                const CoupleQuestsWidget(),
+                const SizedBox(height: 20),
 
                 // Horizontal Wallets List
                 Row(
@@ -279,6 +342,78 @@ class DashboardScreen extends ConsumerWidget {
           );
         },
         child: const Icon(Icons.add, size: 28),
+      ),
+    );
+  }
+
+  Widget _buildAIPredictorCard(BuildContext context, WidgetRef ref, List<TransactionItem> transactions) {
+    final theme = Theme.of(context);
+    final predictions = AIFinanceService.predictUpcomingExpenses(transactions);
+    final topPrediction = predictions.first;
+
+    return Card(
+      color: theme.colorScheme.primaryContainer.withOpacity(0.35),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(topPrediction.iconEmoji, style: const TextStyle(fontSize: 22)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            'AI Smart Insights',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                          ),
+                          const Spacer(),
+                          InkWell(
+                            onTap: () => AIChatDialog.show(context),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.auto_awesome, size: 12, color: Colors.white),
+                                  SizedBox(width: 4),
+                                  Text('ถาม AI', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        topPrediction.title,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              topPrediction.description,
+              style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withOpacity(0.7)),
+            ),
+          ],
+        ),
       ),
     );
   }

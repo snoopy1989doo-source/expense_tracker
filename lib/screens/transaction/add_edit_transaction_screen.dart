@@ -31,6 +31,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
+  final _loveNoteController = TextEditingController();
   
   bool _isIncome = false; // False = Expense, True = Income
   DateTime _selectedDate = DateTime.now();
@@ -53,6 +54,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       final tx = widget.transaction!;
       _amountController.text = tx.amount.toString();
       _noteController.text = tx.note ?? '';
+      _loveNoteController.text = tx.loveNote ?? '';
       _isIncome = tx.type == 'income';
       _selectedDate = tx.date;
       _selectedMainCategoryId = tx.mainCategoryId;
@@ -72,6 +74,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   void dispose() {
     _amountController.dispose();
     _noteController.dispose();
+    _loveNoteController.dispose();
     super.dispose();
   }
 
@@ -301,6 +304,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
         subCategoryId: _selectedSubCategoryId!,
         walletId: _selectedWalletId!,
         note: _noteController.text.trim(),
+        loveNote: _loveNoteController.text.trim().isNotEmpty ? _loveNoteController.text.trim() : null,
         receiptImageUrl: _existingImageUrl,
         isTaxDeductible: _isTaxDeductible,
         createdByUserId: userProfile?.id ?? widget.transaction?.createdByUserId,
@@ -628,6 +632,16 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                       labelText: 'บันทึกข้อความ / หมายเหตุ (ถ้ามี)',
                       hintText: 'กรอกหมายเหตุ หรือบันทึกเพิ่มเติมที่นี่',
                       prefixIcon: Icons.notes,
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Love Memory Note field
+                    CustomTextField(
+                      controller: _loveNoteController,
+                      labelText: 'ข้อความความทรงจำคู่รัก 💕 (ถ้ามี)',
+                      hintText: 'พิมพ์ความประทับใจ เช่น เดตมื้อแรกของเดือน อร่อยมาก 💕',
+                      prefixIcon: Icons.favorite,
                       maxLines: 2,
                     ),
                     const SizedBox(height: 16),
