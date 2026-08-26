@@ -94,6 +94,32 @@ class TransactionTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  if (transaction.createdByName != null && transaction.createdByName!.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.3), width: 0.8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.person, size: 10, color: AppColors.primary),
+                          const SizedBox(width: 2),
+                          Text(
+                            transaction.createdByName!,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   if (transaction.isTaxDeductible)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

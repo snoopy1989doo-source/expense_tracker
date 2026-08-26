@@ -189,6 +189,140 @@ class ReportsScreen extends ConsumerWidget {
               ),
             const SizedBox(height: 24),
 
+            // Couple Expense Split Summary (สรุปสัดส่วนการจ่ายของคู่รัก 👩‍❤️‍👨)
+            const Text('สรุปสัดส่วนการจ่ายของคู่รัก 💕', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 12),
+            () {
+              final expenses = transactions.where((t) => t.type == 'expense').toList();
+              if (expenses.isEmpty) {
+                return const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: Text('ยังไม่มีข้อมูลการจ่ายเงินในเดือนนี้')),
+                  ),
+                );
+              }
+
+              // Group expenses by createdByName
+              final Map<String, double> partnerExpenseMap = {};
+              double totalGroupedExpense = 0;
+
+              for (var tx in expenses) {
+                final name = (tx.createdByName != null && tx.createdByName!.isNotEmpty)
+                    ? tx.createdByName!
+                    : 'ผู้ใช้ร่วม';
+                partnerExpenseMap[name] = (partnerExpenseMap[name] ?? 0) + tx.amount;
+                totalGroupedExpense += tx.amount;
+              }
+
+              final partnerEntries = partnerExpenseMap.entries.toList()
+                ..sort((a, b) => b.value.compareTo(a.value));
+
+              final paletteColors = [
+                AppColors.primary,
+                const Color(0xFF1E88E5),
+                const Color(0xFFFF9800),
+                const Color(0xFF4CAF50),
+              ];
+
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.favorite, color: AppColors.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'เปรียบเทียบการจ่ายประจำเดือน (${partnerEntries.length} สมาชิก)',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Progress bar showing partner breakdown ratio
+                      SizedBox(
+                        height: 22,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Row(
+                            children: partnerEntries.asMap().entries.map((entry) {
+                              final idx = entry.key;
+                              final item = entry.value;
+                              final ratio = totalGroupedExpense > 0 ? item.value / totalGroupedExpense : 0.0;
+                              final color = paletteColors[idx % paletteColors.length];
+                              return Expanded(
+                                flex: (ratio * 1000).toInt().clamp(1, 1000),
+                                child: Container(color: color),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // List of partners with percentage and total amount
+                      ...partnerEntries.asMap().entries.map((entry) {
+                        final idx = entry.key;
+                        final item = entry.value;
+                        final name = item.key;
+                        final amount = item.value;
+                        final pct = totalGroupedExpense > 0 ? (amount / totalGroupedExpense * 100) : 0.0;
+                        final color = paletteColors[idx % paletteColors.length];
+
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 12,
+                                    backgroundColor: color.withOpacity(0.2),
+                                    child: Icon(Icons.person, size: 14, color: color),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    name,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  Text(
+                                    '${pct.toStringAsFixed(1)}%',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: color,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '(${CurrencyFormatter.format(amount)})',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              );
+            }(),
+            const SizedBox(height: 24),
+
             // Tax deductible info card
             Card(
               color: AppColors.taxDeductibleLight.withOpacity(0.3),

@@ -11,6 +11,9 @@ class TransactionItem {
   final String? note;
   final String? receiptImageUrl;
   final bool isTaxDeductible;
+  final String? createdByUserId;
+  final String? createdByName;
+  final String? createdByPhoto;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -25,6 +28,9 @@ class TransactionItem {
     this.note,
     this.receiptImageUrl,
     required this.isTaxDeductible,
+    this.createdByUserId,
+    this.createdByName,
+    this.createdByPhoto,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -40,6 +46,9 @@ class TransactionItem {
     String? note,
     String? receiptImageUrl,
     bool? isTaxDeductible,
+    String? createdByUserId,
+    String? createdByName,
+    String? createdByPhoto,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -54,6 +63,9 @@ class TransactionItem {
       note: note ?? this.note,
       receiptImageUrl: receiptImageUrl ?? this.receiptImageUrl,
       isTaxDeductible: isTaxDeductible ?? this.isTaxDeductible,
+      createdByUserId: createdByUserId ?? this.createdByUserId,
+      createdByName: createdByName ?? this.createdByName,
+      createdByPhoto: createdByPhoto ?? this.createdByPhoto,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -71,6 +83,9 @@ class TransactionItem {
       'note': note,
       'receiptImageUrl': receiptImageUrl,
       'isTaxDeductible': isTaxDeductible,
+      'createdByUserId': createdByUserId,
+      'createdByName': createdByName,
+      'createdByPhoto': createdByPhoto,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -90,6 +105,9 @@ class TransactionItem {
       note: map['note'],
       receiptImageUrl: map['receiptImageUrl'],
       isTaxDeductible: map['isTaxDeductible'] ?? false,
+      createdByUserId: map['createdByUserId'] as String?,
+      createdByName: map['createdByName'] as String?,
+      createdByPhoto: map['createdByPhoto'] as String?,
       createdAt: map['createdAt'] != null
           ? (map['createdAt'] as Timestamp).toDate()
           : DateTime.now(),

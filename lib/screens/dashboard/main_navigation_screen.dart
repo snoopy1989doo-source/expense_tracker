@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dashboard_screen.dart';
 import '../transaction/transaction_list_screen.dart';
 import '../reports/reports_screen.dart';
 import '../settings/settings_screen.dart';
+import '../../providers/transaction_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../models/transaction_item.dart';
+import '../../core/utils/currency_formatter.dart';
 
-class MainNavigationScreen extends StatefulWidget {
+class MainNavigationScreen extends ConsumerStatefulWidget {
   const MainNavigationScreen({super.key});
 
   @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  ConsumerState<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   int _currentIndex = 0;
 
   void _navigateToTransactions() {
@@ -22,6 +27,46 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = ref.watch(authStateProvider).value;
+
+    // Listen to real-time transactions stream for partner notifications
+    ref.listen<List<TransactionItem>>(rawTransactionsProvider, (previous, next) {
+      if (previous != null && next.length > previous.length) {
+        // Find newly added transactions
+        final prevIds = previous.map((t) => t.id).toSet();
+        final newTxs = next.where((t) => !prevIds.contains(t.id)).toList();
+
+        for (var tx in newTxs) {
+          // If transaction was created by partner
+          if (tx.createdByUserId != null && tx.createdByUserId != currentUserId) {
+            final partnerName = tx.createdByName ?? 'แฟนของคุณ';
+            final typeText = tx.type == 'income' ? 'รายรับ' : 'รายจ่าย';
+            final amountText = CurrencyFormatter.format(tx.amount);
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Text('💕 ', style: TextStyle(fontSize: 16)),
+                    Expanded(
+                      child: Text(
+                        '[$partnerName] บันทึก$typeTextใหม่ $amountText ${tx.note != null ? "(${tx.note})" : ""}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: const Color(0xFFE91E63),
+                duration: const Duration(seconds: 4),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            );
+          }
+        }
+      }
+    });
+
     final List<Widget> screens = [
       DashboardScreen(onNavigateToTransactions: _navigateToTransactions),
       const TransactionListScreen(),

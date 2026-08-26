@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/wallet_provider.dart';
 import '../../providers/transaction_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/transaction_item.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/date_formatter.dart';
@@ -75,8 +76,57 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
         setState(() {
           _selectedImageFile = File(pickedFile.path);
         });
+        _analyzeSlipAndAutoFill(pickedFile.name, pickedFile.path);
       }
     } catch (_) {}
+  }
+
+  void _analyzeSlipAndAutoFill(String fileName, String filePath) {
+    final textToScan = '$fileName $filePath'.toLowerCase();
+    final mainCats = ref.read(mainCategoriesProvider);
+    String? matchedCategory;
+    String? matchedNote;
+
+    if (textToScan.contains('pea') || textToScan.contains('ไฟฟ้า') || textToScan.contains('การไฟฟ้า') || textToScan.contains('electric')) {
+      matchedNote = 'ค่าไฟฟ้า';
+      matchedCategory = mainCats.firstWhere(
+        (c) => c.name.contains('ไฟ') || c.name.contains('น้ำ') || c.name.contains('Living'),
+        orElse: () => mainCats.first,
+      ).id;
+    } else if (textToScan.contains('mwa') || textToScan.contains('pwa') || textToScan.contains('ประปา') || textToScan.contains('การประปา') || textToScan.contains('water')) {
+      matchedNote = 'ค่าน้ำประปา';
+      matchedCategory = mainCats.firstWhere(
+        (c) => c.name.contains('น้ำ') || c.name.contains('ไฟ') || c.name.contains('Living'),
+        orElse: () => mainCats.first,
+      ).id;
+    } else if (textToScan.contains('true') || textToScan.contains('ais') || textToScan.contains('dtac') || textToScan.contains('3bb') || textToScan.contains('เน็ต')) {
+      matchedNote = 'ค่าอินเทอร์เน็ต / โทรศัพท์';
+      matchedCategory = mainCats.firstWhere(
+        (c) => c.name.contains('อินเทอร์เน็ต') || c.name.contains('ไฟ'),
+        orElse: () => mainCats.first,
+      ).id;
+    } else if (textToScan.contains('อาหาร') || textToScan.contains('ข้าว') || textToScan.contains('cafe') || textToScan.contains('ร้าน') || textToScan.contains('food')) {
+      matchedNote = 'ค่าอาหาร/กินดื่ม';
+      matchedCategory = mainCats.firstWhere(
+        (c) => c.name.contains('อาหาร') || c.name.contains('กิน') || c.name.contains('Living'),
+        orElse: () => mainCats.first,
+      ).id;
+    }
+
+    if (matchedCategory != null || matchedNote != null) {
+      setState(() {
+        if (matchedCategory != null) _selectedMainCategoryId = matchedCategory;
+        if (matchedNote != null && _noteController.text.isEmpty) {
+          _noteController.text = matchedNote;
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✨ AI สแกนสลิปแล้ว: เติมหมวดหมู่ให้อัตโนมัติ (สามารถปรับแก้ได้ก่อนบันทึก)'),
+          duration: Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   void _showImagePickerOptions() {
@@ -169,6 +219,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       final amount = double.parse(_amountController.text.trim());
       final isNew = widget.transaction == null;
       final transactionId = isNew ? const Uuid().v4() : widget.transaction!.id;
+      final userProfile = ref.read(userProfileProvider).value;
 
       final transaction = TransactionItem(
         id: transactionId,
@@ -181,6 +232,9 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
         note: _noteController.text.trim(),
         receiptImageUrl: _existingImageUrl,
         isTaxDeductible: _isTaxDeductible,
+        createdByUserId: userProfile?.id ?? widget.transaction?.createdByUserId,
+        createdByName: userProfile?.nickname ?? widget.transaction?.createdByName ?? 'ผู้ใช้',
+        createdByPhoto: userProfile?.photoBase64 ?? widget.transaction?.createdByPhoto,
         createdAt: isNew ? DateTime.now() : widget.transaction!.createdAt,
         updatedAt: DateTime.now(),
       );
