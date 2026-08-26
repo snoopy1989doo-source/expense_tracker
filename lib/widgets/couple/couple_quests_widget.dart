@@ -11,23 +11,101 @@ class CoupleQuestsWidget extends StatefulWidget {
 class _CoupleQuestsWidgetState extends State<CoupleQuestsWidget> {
   bool _isQuestCompleted = false;
 
-  final List<Map<String, String>> _quests = const [
+  final List<Map<String, String>> _quests = [
     {
-      'title': '☕ ภารกิจวันนี้: เลี้ยงกาแฟ/เครื่องดื่มแฟน 1 แก้ว',
-      'desc': 'เพิ่มความหวานให้กันในวันทำงาน (+10 คะแนนความรัก)',
+      'title': '☕ ภารกิจจันทร์: เลี้ยงกาแฟ/เครื่องดื่มแฟน 1 แก้ว',
+      'desc': 'เพิ่มความหวานวันทำงาน (+10 คะแนนความรัก)',
       'reward': '💖 +10 คะแนนความรัก',
     },
     {
-      'title': '🍱 ภารกิจวันนี้: ทำมื้อเย็นกินด้วยกันที่บ้าน',
-      'desc': 'ประหยัดงบค่านอกบ้าน แถมได้ใช้เวลาคุณภาพร่วมกัน (+15 คะแนนการเงิน)',
+      'title': '🍱 ภารกิจอังคาร: ทำมื้อเย็นกินด้วยกันที่บ้าน',
+      'desc': 'ช่วยกันประหยัดค่านอกบ้าน (+15 คะแนนการเงิน)',
       'reward': '💰 +15 คะแนนการเงิน',
     },
     {
-      'title': '🍦 ภารกิจวันนี้: พาแฟนไปกินของอร่อยงบไม่เกิน ฿150',
+      'title': '🍦 ภารกิจพุธ: พาแฟนไปกินของอร่อยงบไม่เกิน ฿150',
       'desc': 'ความสุขเล็กๆ ในงบประหยัด (+10 คะแนนความสุข)',
       'reward': '😊 +10 คะแนนความสุข',
     },
+    {
+      'title': '🍿 ภารกิจพฤหัสบดี: ดูหนังเรื่องโปรดด้วยกันที่บ้าน',
+      'desc': 'ผ่อนคลายความเหนื่อยล้าด้วยกัน (+15 คะแนนความรัก)',
+      'reward': '💖 +15 คะแนนความรัก',
+    },
+    {
+      'title': '🛍️ ภารกิจศุกร์: ช่วยกันเช็กยอดเงินคงเหลือปลายสัปดาห์',
+      'desc': 'วางแผนการเงินและออมเงินร่วมกัน (+20 คะแนนการเงิน)',
+      'reward': '💰 +20 คะแนนการเงิน',
+    },
+    {
+      'title': '🚴 ภารกิจเสาร์: ออกกำลังกาย/เดินเล่นสวนสาธารณะคู่กัน',
+      'desc': 'สุขภาพดี & ใช้เวลาคุณภาพ (+15 คะแนนความสุข)',
+      'reward': '😊 +15 คะแนนความสุข',
+    },
+    {
+      'title': '🧹 ภารกิจอาทิตย์: ช่วยกันทำความสะอาดห้อง/จัดบ้าน',
+      'desc': 'สร้างสภาพแวดล้อมอบอุ่นในบ้าน (+15 คะแนนความรัก)',
+      'reward': '💖 +15 คะแนนความรัก',
+    },
   ];
+
+  void _addCustomQuestDialog() {
+    final titleController = TextEditingController();
+    final descController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('➕ เพิ่มภารกิจคู่รักของคุณเอง', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(
+                labelText: 'ชื่อภารกิจคู่รัก (เช่น 💕 กอดกัน 10 วินาที)',
+                hintText: 'กรอกภารกิจน่ารักๆ สำหรับคุณกับแฟน',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descController,
+              decoration: const InputDecoration(
+                labelText: 'คำอธิบาย / รางวัล (เช่น +20 คะแนนความหวาน)',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final title = titleController.text.trim();
+              final desc = descController.text.trim();
+              if (title.isNotEmpty) {
+                setState(() {
+                  _quests.add({
+                    'title': '💕 $title',
+                    'desc': desc.isNotEmpty ? desc : 'ภารกิจพิเศษประจำคู่เรา (+15 คะแนนความรัก)',
+                    'reward': '💖 +15 คะแนนความรัก',
+                  });
+                });
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('✨ เพิ่มภารกิจ "$title" เรียบร้อยแล้ว!')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            child: const Text('บันทึกภารกิจ'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -147,6 +225,15 @@ class _CoupleQuestsWidgetState extends State<CoupleQuestsWidget> {
                     child: Text(_isQuestCompleted ? 'สำเร็จแล้ว! ✨' : 'ทำภารกิจ 💕', style: const TextStyle(fontSize: 11)),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _addCustomQuestDialog,
+                icon: const Icon(Icons.add, size: 14),
+                label: Text('➕ เพิ่มภารกิจคู่เราเอง (${_quests.length} ภารกิจ)', style: const TextStyle(fontSize: 11)),
               ),
             ),
           ],
