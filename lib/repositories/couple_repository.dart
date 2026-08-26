@@ -120,4 +120,20 @@ class CoupleRepository {
       return CoupleRoom.fromMap(snap.data()!, snap.id);
     });
   }
+
+  /// Add custom food item to room
+  Future<void> addCustomFoodToRoom(String roomId, Map<String, String> foodItem) async {
+    if (!_isAvailable) return;
+    await _firestore!.collection('couple_rooms').doc(roomId).set({
+      'customFoodMenu': FieldValue.arrayUnion([foodItem]),
+    }, SetOptions(merge: true));
+  }
+
+  /// Add custom quest item to room
+  Future<void> addCustomQuestToRoom(String roomId, Map<String, String> questItem) async {
+    if (!_isAvailable) return;
+    await _firestore!.collection('couple_rooms').doc(roomId).set({
+      'customQuests': FieldValue.arrayUnion([questItem]),
+    }, SetOptions(merge: true));
+  }
 }

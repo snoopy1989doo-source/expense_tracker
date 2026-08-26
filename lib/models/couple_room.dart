@@ -1,9 +1,11 @@
-﻿class CoupleRoom {
+class CoupleRoom {
   final String id;
   final String inviteCode;
   final List<String> memberIds;
   final String createdBy;
   final DateTime createdAt;
+  final List<Map<String, String>> customFoodMenu;
+  final List<Map<String, String>> customQuests;
 
   CoupleRoom({
     required this.id,
@@ -11,6 +13,8 @@
     required this.memberIds,
     required this.createdBy,
     required this.createdAt,
+    this.customFoodMenu = const [],
+    this.customQuests = const [],
   });
 
   bool get isFull => memberIds.length >= 2;
@@ -24,6 +28,12 @@
       createdAt: map['createdAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int)
           : DateTime.now(),
+      customFoodMenu: (map['customFoodMenu'] as List? ?? [])
+          .map((item) => Map<String, String>.from(item as Map))
+          .toList(),
+      customQuests: (map['customQuests'] as List? ?? [])
+          .map((item) => Map<String, String>.from(item as Map))
+          .toList(),
     );
   }
 
@@ -33,6 +43,8 @@
       'memberIds': memberIds,
       'createdBy': createdBy,
       'createdAt': createdAt.millisecondsSinceEpoch,
+      'customFoodMenu': customFoodMenu,
+      'customQuests': customQuests,
     };
   }
 }

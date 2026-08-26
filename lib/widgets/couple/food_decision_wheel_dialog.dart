@@ -1,9 +1,11 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../screens/transaction/add_edit_transaction_screen.dart';
+import '../../providers/couple_provider.dart';
 
-class FoodDecisionWheelDialog extends StatefulWidget {
+class FoodDecisionWheelDialog extends ConsumerStatefulWidget {
   const FoodDecisionWheelDialog({super.key});
 
   static void show(BuildContext context) {
@@ -14,17 +16,17 @@ class FoodDecisionWheelDialog extends StatefulWidget {
   }
 
   @override
-  State<FoodDecisionWheelDialog> createState() => _FoodDecisionWheelDialogState();
+  ConsumerState<FoodDecisionWheelDialog> createState() => _FoodDecisionWheelDialogState();
 }
 
-class _FoodDecisionWheelDialogState extends State<FoodDecisionWheelDialog> with SingleTickerProviderStateMixin {
+class _FoodDecisionWheelDialogState extends ConsumerState<FoodDecisionWheelDialog> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
   double _targetAngle = 0;
   String? _selectedFood;
   bool _isSpinning = false;
 
-  final List<Map<String, String>> _foodMenu = [
+  final List<Map<String, String>> _defaultFoodMenu = [
     {'name': 'ชาบู / หมูกระทะ', 'emoji': '🍲'},
     {'name': 'ส้มตำ / ยำแซ่บ', 'emoji': '🥗'},
     {'name': 'ข้าวมันไก่ / ข้าวหมูแดง', 'emoji': '🍗'},
@@ -34,6 +36,8 @@ class _FoodDecisionWheelDialogState extends State<FoodDecisionWheelDialog> with 
     {'name': 'อาหารตามสั่ง / ข้าวไข่เจียว', 'emoji': '🍳'},
     {'name': 'ชาไข่มุก / ของหวาน', 'emoji': '🧋'},
   ];
+
+  final List<Map<String, String>> _localCustomMenu = [];
 
   @override
   void initState() {
@@ -51,6 +55,12 @@ class _FoodDecisionWheelDialogState extends State<FoodDecisionWheelDialog> with 
         });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   void _addCustomFoodDialog() {
@@ -86,17 +96,24 @@ class _FoodDecisionWheelDialogState extends State<FoodDecisionWheelDialog> with 
             child: const Text('ยกเลิก'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final name = nameController.text.trim();
               final emoji = emojiController.text.trim().isEmpty ? '🍱' : emojiController.text.trim();
               if (name.isNotEmpty) {
+                final newItem = {'name': name, 'emoji': emoji};
+                final roomId = ref.read(coupleRoomIdProvider);
+                if (roomId != null) {
+                  await ref.read(coupleRepositoryProvider).addCustomFoodToRoom(roomId, newItem);
+                }
                 setState(() {
-                  _foodMenu.add({'name': name, 'emoji': emoji});
+                  _localCustomMenu.add(newItem);
                 });
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('✨ เพิ่มเมนู "$emoji $name" เข้าวงล้อสำเร็จ!')),
-                );
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('✨ เพิ่มเมนู "$emoji $name" เข้า Firebase และแสดงทั้งคุณและแฟนเรียบร้อยแล้ว!')),
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
@@ -107,22 +124,15 @@ class _FoodDecisionWheelDialogState extends State<FoodDecisionWheelDialog> with 
     );
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _spinWheel() {
-    if (_isSpinning) return;
+  void _spinWheel(List<Map<String, String>> activeMenu) {
+    if (_isSpinning || activeMenu.isEmpty) return;
 
     final random = Random();
-    final chosenIndex = random.nextInt(_foodMenu.length);
-    final food = _foodMenu[chosenIndex];
+    final chosenIndex = random.nextInt(activeMenu.length);
+    final food = activeMenu[chosenIndex];
 
-    // Calculate turns (at least 4 full spins + angle offset)
     final double fullTurns = 4 * 2 * pi;
-    final double sectorAngle = (2 * pi) / _foodMenu.length;
+    final double sectorAngle = (2 * pi) / activeMenu.length;
     final double targetOffset = (fullTurns + (chosenIndex * sectorAngle));
 
     setState(() {
@@ -137,6 +147,23 @@ class _FoodDecisionWheelDialogState extends State<FoodDecisionWheelDialog> with 
 
   @override
   Widget build(BuildContext context) {
+    final coupleRoom = ref.watch(coupleRoomProvider).value;
+
+    final Map<String, Map<String, String>> uniqueMenu = {};
+    for (var f in _defaultFoodMenu) {
+      uniqueMenu['${f['emoji']}_${f['name']}'] = f;
+    }
+    for (var f in _localCustomMenu) {
+      uniqueMenu['${f['emoji']}_${f['name']}'] = f;
+    }
+    if (coupleRoom != null) {
+      for (var f in coupleRoom.customFoodMenu) {
+        uniqueMenu['${f['emoji']}_${f['name']}'] = f;
+      }
+    }
+
+    final activeMenu = uniqueMenu.values.toList();
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Padding(
@@ -165,7 +192,7 @@ class _FoodDecisionWheelDialogState extends State<FoodDecisionWheelDialog> with 
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       Text(
-                        'วงล้อสุ่มมื้ออาหารแก้ปัญหายอดฮิตคู่รัก',
+                        'วงล้อสุ่มมื้ออาหาร (ซิงก์ Firebase แสดงทั้งคู่)',
                         style: TextStyle(fontSize: 11, color: Colors.grey),
                       ),
                     ],
@@ -244,7 +271,7 @@ class _FoodDecisionWheelDialogState extends State<FoodDecisionWheelDialog> with 
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: _isSpinning ? null : _spinWheel,
+                    onPressed: _isSpinning ? null : () => _spinWheel(activeMenu),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -281,7 +308,7 @@ class _FoodDecisionWheelDialogState extends State<FoodDecisionWheelDialog> with 
             TextButton.icon(
               onPressed: _isSpinning ? null : _addCustomFoodDialog,
               icon: const Icon(Icons.add, size: 16),
-              label: Text('➕ เพิ่มเมนูโปรดของคุณ (${_foodMenu.length} เมนูในวงล้อ)', style: const TextStyle(fontSize: 12)),
+              label: Text('➕ เพิ่มเมนูโปรดของคุณ (${activeMenu.length} เมนูในวงล้อ)', style: const TextStyle(fontSize: 12)),
             ),
           ],
         ),

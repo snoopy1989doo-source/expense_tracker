@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
+import '../../providers/couple_provider.dart';
 
-class CoupleQuestsWidget extends StatefulWidget {
+class CoupleQuestsWidget extends ConsumerStatefulWidget {
   const CoupleQuestsWidget({super.key});
 
   @override
-  State<CoupleQuestsWidget> createState() => _CoupleQuestsWidgetState();
+  ConsumerState<CoupleQuestsWidget> createState() => _CoupleQuestsWidgetState();
 }
 
-class _CoupleQuestsWidgetState extends State<CoupleQuestsWidget> {
+class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
   bool _isQuestCompleted = false;
 
-  final List<Map<String, String>> _quests = [
+  final List<Map<String, String>> _defaultQuests = [
     {
       'title': '☕ ภารกิจจันทร์: เลี้ยงกาแฟ/เครื่องดื่มแฟน 1 แก้ว',
       'desc': 'เพิ่มความหวานวันทำงาน (+10 คะแนนความรัก)',
@@ -49,6 +51,8 @@ class _CoupleQuestsWidgetState extends State<CoupleQuestsWidget> {
     },
   ];
 
+  final List<Map<String, String>> _localCustomQuests = [];
+
   void _addCustomQuestDialog() {
     final titleController = TextEditingController();
     final descController = TextEditingController();
@@ -82,21 +86,28 @@ class _CoupleQuestsWidgetState extends State<CoupleQuestsWidget> {
             child: const Text('ยกเลิก'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final title = titleController.text.trim();
               final desc = descController.text.trim();
               if (title.isNotEmpty) {
+                final questItem = {
+                  'title': '💕 $title',
+                  'desc': desc.isNotEmpty ? desc : 'ภารกิจพิเศษประจำคู่เรา (+15 คะแนนความรัก)',
+                  'reward': '💖 +15 คะแนนความรัก',
+                };
+                final roomId = ref.read(coupleRoomIdProvider);
+                if (roomId != null) {
+                  await ref.read(coupleRepositoryProvider).addCustomQuestToRoom(roomId, questItem);
+                }
                 setState(() {
-                  _quests.add({
-                    'title': '💕 $title',
-                    'desc': desc.isNotEmpty ? desc : 'ภารกิจพิเศษประจำคู่เรา (+15 คะแนนความรัก)',
-                    'reward': '💖 +15 คะแนนความรัก',
-                  });
+                  _localCustomQuests.add(questItem);
                 });
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('✨ เพิ่มภารกิจ "$title" เรียบร้อยแล้ว!')),
-                );
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('✨ เพิ่มภารกิจ "$title" เข้า Firebase เรียบร้อยแล้ว!')),
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
@@ -110,8 +121,24 @@ class _CoupleQuestsWidgetState extends State<CoupleQuestsWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final dayIndex = DateTime.now().day % _quests.length;
-    final currentQuest = _quests[dayIndex];
+    final coupleRoom = ref.watch(coupleRoomProvider).value;
+
+    final Map<String, Map<String, String>> uniqueQuests = {};
+    for (var q in _defaultQuests) {
+      uniqueQuests[q['title']!] = q;
+    }
+    for (var q in _localCustomQuests) {
+      uniqueQuests[q['title']!] = q;
+    }
+    if (coupleRoom != null) {
+      for (var q in coupleRoom.customQuests) {
+        uniqueQuests[q['title']!] = q;
+      }
+    }
+
+    final activeQuests = uniqueQuests.values.toList();
+    final dayIndex = DateTime.now().day % activeQuests.length;
+    final currentQuest = activeQuests[dayIndex];
 
     return Card(
       child: Padding(
@@ -233,7 +260,7 @@ class _CoupleQuestsWidgetState extends State<CoupleQuestsWidget> {
               child: TextButton.icon(
                 onPressed: _addCustomQuestDialog,
                 icon: const Icon(Icons.add, size: 14),
-                label: Text('➕ เพิ่มภารกิจคู่เราเอง (${_quests.length} ภารกิจ)', style: const TextStyle(fontSize: 11)),
+                label: Text('➕ เพิ่มภารกิจคู่เราเอง (${activeQuests.length} ภารกิจ)', style: const TextStyle(fontSize: 11)),
               ),
             ),
           ],
