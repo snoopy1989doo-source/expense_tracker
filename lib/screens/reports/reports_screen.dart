@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../providers/report_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/wallet_provider.dart';
@@ -203,14 +204,18 @@ class ReportsScreen extends ConsumerWidget {
                 );
               }
 
-              // Group expenses by createdByName
+              final userProfile = ref.watch(userProfileProvider).value;
+
+              // Group expenses by createdByName (fallback to userProfile.nickname if current user)
               final Map<String, double> partnerExpenseMap = {};
               double totalGroupedExpense = 0;
 
               for (var tx in expenses) {
-                final name = (tx.createdByName != null && tx.createdByName!.isNotEmpty)
-                    ? tx.createdByName!
-                    : 'ผู้ใช้ร่วม';
+                final name = (userProfile != null && tx.createdByUserId == userProfile.id && userProfile.nickname.isNotEmpty)
+                    ? userProfile.nickname
+                    : (tx.createdByName != null && tx.createdByName!.isNotEmpty
+                        ? tx.createdByName!
+                        : 'ผู้ใช้ร่วม');
                 partnerExpenseMap[name] = (partnerExpenseMap[name] ?? 0) + tx.amount;
                 totalGroupedExpense += tx.amount;
               }
