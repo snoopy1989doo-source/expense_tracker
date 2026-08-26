@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/onboarding_provider.dart';
+import '../../models/user_profile.dart';
 import '../category/category_management_screen.dart';
 import '../wallet/wallet_management_screen.dart';
 import '../couple/couple_setup_screen.dart';
@@ -23,8 +24,62 @@ class SettingsScreen extends ConsumerWidget {
     final authState = ref.watch(authNotifierProvider);
     final coupleRoomId = ref.watch(coupleRoomIdProvider);
     final coupleRoomAsync = ref.watch(coupleRoomProvider);
+    final userProfile = ref.watch(userProfileProvider).value;
 
     final theme = Theme.of(context);
+
+    void editNicknameDialog() {
+      final nicknameController = TextEditingController(text: userProfile?.nickname ?? '');
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('✏️ แก้ไขชื่อผู้ใช้ในแอป (Nickname)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nicknameController,
+                decoration: const InputDecoration(
+                  labelText: 'ชื่อเล่นของคุณในแอป (เช่น ยู, เมย์)',
+                  hintText: 'กรอกชื่อเล่นที่ต้องการให้แสดงในสลิปและป้ายชื่อ',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('ยกเลิก'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newName = nicknameController.text.trim();
+                if (newName.isNotEmpty && authState.userId != null) {
+                  final profileRepo = ref.read(userProfileRepositoryProvider);
+                  final updatedProfile = UserProfile(
+                    id: authState.userId!,
+                    email: userProfile?.email ?? '',
+                    nickname: newName,
+                    photoBase64: userProfile?.photoBase64,
+                    coupleRoomId: userProfile?.coupleRoomId,
+                    createdAt: userProfile?.createdAt ?? DateTime.now(),
+                  );
+                  await profileRepo.saveProfile(updatedProfile);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('✨ เปลี่ยนชื่อเล่นเป็น "$newName" สำเร็จ!')),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              child: const Text('บันทึก'),
+            ),
+          ],
+        ),
+      );
+    }
 
     void confirmResetCategories() {
       ConfirmDialog.show(
@@ -76,6 +131,58 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
         children: [
+          // User Profile Card (👤 Nickname)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppColors.primary.withOpacity(0.12),
+                  child: Text(
+                    userProfile?.nickname?.isNotEmpty == true ? userProfile!.nickname.substring(0, 1) : '👤',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 18),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            userProfile?.nickname ?? 'ยังไม่ได้ตั้งชื่อเล่น',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.verified_user, size: 14, color: AppColors.primary),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'อีเมล: ${userProfile?.email ?? authState.userId ?? "-"}',
+                        style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit, color: AppColors.primary, size: 20),
+                  tooltip: 'แก้ไขชื่อเล่น',
+                  onPressed: editNicknameDialog,
+                ),
+              ],
+            ),
+          ),
+
           // Couple Room Management Section (💕)
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
