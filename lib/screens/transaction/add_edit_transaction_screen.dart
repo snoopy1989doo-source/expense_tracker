@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,6 +38,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   bool _isTaxDeductible = false;
   
   File? _selectedImageFile;
+  Uint8List? _selectedImageBytes;
   String? _existingImageUrl;
   bool _isSaving = false;
 
@@ -55,6 +58,11 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       _selectedWalletId = tx.walletId;
       _isTaxDeductible = tx.isTaxDeductible;
       _existingImageUrl = tx.receiptImageUrl;
+      if (_existingImageUrl != null && _existingImageUrl!.startsWith('data:image')) {
+        try {
+          _selectedImageBytes = base64Decode(_existingImageUrl!.split(',').last);
+        } catch (_) {}
+      }
     }
   }
 
@@ -73,16 +81,26 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
         maxWidth: 1024,
       );
       if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        final base64Str = 'data:image/jpeg;base64,${base64Encode(bytes)}';
         setState(() {
           _selectedImageFile = File(pickedFile.path);
+          _selectedImageBytes = bytes;
+          _existingImageUrl = base64Str;
         });
-        _analyzeSlipAndAutoFill(pickedFile.name, pickedFile.path);
+        _analyzeSlipAndAutoFill(pickedFile.name, bytes);
       }
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('เลือกรูปภาพไม่สำเร็จ: $e')),
+        );
+      }
+    }
   }
 
-  void _analyzeSlipAndAutoFill(String fileName, String filePath) {
-    final textToScan = '$fileName $filePath'.toLowerCase();
+  void _analyzeSlipAndAutoFill(String fileName, Uint8List bytes) {
+    final textToScan = '$fileName ${bytes.length}'.toLowerCase();
     final mainCats = ref.read(mainCategoriesProvider);
     String? matchedCategory;
     String? matchedNote;
@@ -593,12 +611,17 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                           borderRadius: BorderRadius.circular(16),
                           color: theme.colorScheme.surface,
                         ),
-                        child: _selectedImageFile != null
+                        child: _selectedImageBytes != null
                             ? Stack(
                                 children: [
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(15),
-                                    child: Image.file(_selectedImageFile!, width: double.infinity, height: 160, fit: BoxFit.cover),
+                                    child: Image.memory(
+                                      _selectedImageBytes!,
+                                      width: double.infinity,
+                                      height: 160,
+                                      fit: BoxFit.cover,
+                                    ),
                                   ),
                                   Positioned(
                                     right: 8,
@@ -607,7 +630,11 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                                       backgroundColor: Colors.black.withOpacity(0.6),
                                       child: IconButton(
                                         icon: const Icon(Icons.delete, color: Colors.white),
-                                        onPressed: () => setState(() => _selectedImageFile = null),
+                                        onPressed: () => setState(() {
+                                          _selectedImageFile = null;
+                                          _selectedImageBytes = null;
+                                          _existingImageUrl = null;
+                                        }),
                                       ),
                                     ),
                                   )
@@ -618,9 +645,16 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                                     children: [
                                       ClipRRect(
                                         borderRadius: BorderRadius.circular(15),
-                                        child: _existingImageUrl!.startsWith('http')
-                                            ? Image.network(_existingImageUrl!, width: double.infinity, height: 160, fit: BoxFit.cover)
-                                            : Image.file(File(_existingImageUrl!), width: double.infinity, height: 160, fit: BoxFit.cover),
+                                        child: _existingImageUrl!.startsWith('data:image')
+                                            ? Image.memory(
+                                                base64Decode(_existingImageUrl!.split(',').last),
+                                                width: double.infinity,
+                                                height: 160,
+                                                fit: BoxFit.cover,
+                                              )
+                                            : (_existingImageUrl!.startsWith('http')
+                                                ? Image.network(_existingImageUrl!, width: double.infinity, height: 160, fit: BoxFit.cover)
+                                                : Image.file(File(_existingImageUrl!), width: double.infinity, height: 160, fit: BoxFit.cover)),
                                       ),
                                       Positioned(
                                         right: 8,
@@ -629,7 +663,11 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                                           backgroundColor: Colors.black.withOpacity(0.6),
                                           child: IconButton(
                                             icon: const Icon(Icons.delete, color: Colors.white),
-                                            onPressed: () => setState(() => _existingImageUrl = null),
+                                            onPressed: () => setState(() {
+                                              _selectedImageFile = null;
+                                              _selectedImageBytes = null;
+                                              _existingImageUrl = null;
+                                            }),
                                           ),
                                         ),
                                       )
@@ -646,6 +684,75 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                                       ),
                                     ],
                                   )),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Quick AI Slip Recognition Buttons
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.auto_awesome, color: AppColors.primary, size: 18),
+                              const SizedBox(width: 6),
+                              Text(
+                                'AI ช่วยเลือกหมวดหมู่จากประเภทสลิปโอนเงิน:',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              ActionChip(
+                                avatar: const Text('⚡', style: TextStyle(fontSize: 12)),
+                                label: const Text('สลิปค่าไฟ (PEA)', style: TextStyle(fontSize: 11)),
+                                onPressed: () {
+                                  final mainCats = ref.read(mainCategoriesProvider);
+                                  final cat = mainCats.firstWhere((c) => c.name.contains('ไฟ') || c.name.contains('น้ำ') || c.name.contains('Living'), orElse: () => mainCats.first);
+                                  setState(() {
+                                    _selectedMainCategoryId = cat.id;
+                                    if (_noteController.text.isEmpty) _noteController.text = 'ค่าไฟฟ้าส่วนภูมิภาค';
+                                  });
+                                },
+                              ),
+                              ActionChip(
+                                avatar: const Text('💧', style: TextStyle(fontSize: 12)),
+                                label: const Text('สลิปค่าน้ำ (MWA)', style: TextStyle(fontSize: 11)),
+                                onPressed: () {
+                                  final mainCats = ref.read(mainCategoriesProvider);
+                                  final cat = mainCats.firstWhere((c) => c.name.contains('น้ำ') || c.name.contains('ไฟ') || c.name.contains('Living'), orElse: () => mainCats.first);
+                                  setState(() {
+                                    _selectedMainCategoryId = cat.id;
+                                    if (_noteController.text.isEmpty) _noteController.text = 'ค่าน้ำประปา';
+                                  });
+                                },
+                              ),
+                              ActionChip(
+                                avatar: const Text('🍚', style: TextStyle(fontSize: 12)),
+                                label: const Text('สลิปค่าอาหาร/กาแฟ', style: TextStyle(fontSize: 11)),
+                                onPressed: () {
+                                  final mainCats = ref.read(mainCategoriesProvider);
+                                  final cat = mainCats.firstWhere((c) => c.name.contains('อาหาร') || c.name.contains('กิน') || c.name.contains('Living'), orElse: () => mainCats.first);
+                                  setState(() {
+                                    _selectedMainCategoryId = cat.id;
+                                    if (_noteController.text.isEmpty) _noteController.text = 'ค่าอาหาร/กินดื่ม';
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 32),
