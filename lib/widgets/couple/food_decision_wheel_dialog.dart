@@ -24,7 +24,7 @@ class _FoodDecisionWheelDialogState extends State<FoodDecisionWheelDialog> with 
   String? _selectedFood;
   bool _isSpinning = false;
 
-  final List<Map<String, String>> _foodMenu = const [
+  final List<Map<String, String>> _foodMenu = [
     {'name': 'ชาบู / หมูกระทะ', 'emoji': '🍲'},
     {'name': 'ส้มตำ / ยำแซ่บ', 'emoji': '🥗'},
     {'name': 'ข้าวมันไก่ / ข้าวหมูแดง', 'emoji': '🍗'},
@@ -51,6 +51,60 @@ class _FoodDecisionWheelDialogState extends State<FoodDecisionWheelDialog> with 
         });
       }
     });
+  }
+
+  void _addCustomFoodDialog() {
+    final nameController = TextEditingController();
+    final emojiController = TextEditingController(text: '🍱');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('➕ เพิ่มเมนูอาหารโปรดของคุณ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'ชื่อเมนูอาหาร (เช่น สุกี้จินดา, กะเพราไข่ดาว)',
+                hintText: 'กรอกชื่อเมนูโปรดของคุณกับแฟน',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: emojiController,
+              decoration: const InputDecoration(
+                labelText: 'Emoji ประจำเมนู (เช่น 🍱, 🍣, 🍕)',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = nameController.text.trim();
+              final emoji = emojiController.text.trim().isEmpty ? '🍱' : emojiController.text.trim();
+              if (name.isNotEmpty) {
+                setState(() {
+                  _foodMenu.add({'name': name, 'emoji': emoji});
+                });
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('✨ เพิ่มเมนู "$emoji $name" เข้าวงล้อสำเร็จ!')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            child: const Text('บันทึกเมนู'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -222,6 +276,12 @@ class _FoodDecisionWheelDialogState extends State<FoodDecisionWheelDialog> with 
                   ),
                 ],
               ],
+            ),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: _isSpinning ? null : _addCustomFoodDialog,
+              icon: const Icon(Icons.add, size: 16),
+              label: Text('➕ เพิ่มเมนูโปรดของคุณ (${_foodMenu.length} เมนูในวงล้อ)', style: const TextStyle(fontSize: 12)),
             ),
           ],
         ),
