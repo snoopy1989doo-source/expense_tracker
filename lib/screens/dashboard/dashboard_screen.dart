@@ -15,6 +15,8 @@ import '../../services/ai_finance_service.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
 import '../../widgets/couple/couple_quests_widget.dart';
 import '../../widgets/couple/food_decision_wheel_dialog.dart';
+import '../../widgets/couple/couple_savings_widget.dart';
+import '../../widgets/couple/couple_calendar_dialog.dart';
 import '../../models/transaction_item.dart';
 import '../transaction/add_edit_transaction_screen.dart';
 
@@ -179,14 +181,14 @@ class DashboardScreen extends ConsumerWidget {
                 _buildAIPredictorCard(context, ref, ref.watch(rawTransactionsProvider)),
                 const SizedBox(height: 16),
 
-                // Quick Couple Gimmick Buttons Row (AI Chat & Food Decision Wheel)
+                // Quick Couple Gimmick Buttons Row (AI Chat, Food Decision Wheel, Memory Calendar)
                 Row(
                   children: [
                     Expanded(
                       child: InkWell(
                         onTap: () => AIChatDialog.show(context),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                           decoration: BoxDecoration(
                             color: Colors.pink.shade50,
                             borderRadius: BorderRadius.circular(14),
@@ -195,20 +197,20 @@ class DashboardScreen extends ConsumerWidget {
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.auto_awesome, color: AppColors.primary, size: 18),
-                              SizedBox(width: 6),
-                              Text('ถาม AI การเงิน 🤖', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                              Icon(Icons.auto_awesome, color: AppColors.primary, size: 16),
+                              SizedBox(width: 4),
+                              Text('ถาม AI 🤖', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
                             ],
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: InkWell(
                         onTap: () => FoodDecisionWheelDialog.show(context),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                           decoration: BoxDecoration(
                             color: Colors.orange.shade50,
                             borderRadius: BorderRadius.circular(14),
@@ -217,9 +219,31 @@ class DashboardScreen extends ConsumerWidget {
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.casino, color: Colors.orange, size: 18),
-                              SizedBox(width: 6),
-                              Text('เย็นนี้กินอะไรดี? 🎰', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange)),
+                              Icon(Icons.casino, color: Colors.orange, size: 16),
+                              SizedBox(width: 4),
+                              Text('กินอะไรดี? 🎰', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => CoupleCalendarDialog.show(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.shade50,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.purple.shade300),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.calendar_month, color: Colors.purple, size: 16),
+                              SizedBox(width: 4),
+                              Text('ปฏิทินรัก 📅', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.purple)),
                             ],
                           ),
                         ),
@@ -227,6 +251,10 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 20),
+
+                // Couple Shared Savings Pot Widget (🐷)
+                const CoupleSavingsWidget(),
                 const SizedBox(height: 20),
 
                 // Couple Quests & Horoscope Card
