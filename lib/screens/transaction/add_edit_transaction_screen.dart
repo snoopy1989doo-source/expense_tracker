@@ -45,6 +45,10 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   String? _existingImageUrl;
   bool _isSaving = false;
 
+  // Split Bill / Multi-Category Breakdown mode 🔀
+  bool _isSplitBill = false;
+  final List<Map<String, dynamic>> _splitItems = [];
+
   final _picker = ImagePicker();
 
   @override
@@ -139,7 +143,6 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     String? matchedNote;
     double? matchedAmount;
 
-    // Amount extraction regex
     final amountRegex = RegExp(r'(\d{1,3}(?:,\d{3})*\.\d{2})');
     final matches = amountRegex.allMatches(extractedText);
     for (var m in matches) {
@@ -191,7 +194,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
 
       final successMsg = matchedAmount != null
           ? '✨ AI อ่านสลิปสำเร็จ! พบยอดเงิน ฿${matchedAmount.toStringAsFixed(2)} (${matchedNote ?? "เลือกหมวดหมู่อัตโนมัติ"})'
-          : '✨ AI สแกนสลิปสำเร็จ! เติมหมวดหมู่ให้อัตโนมัติ (สามารถปรับแก้ได้ก่อนบันทึก)';
+          : '✨ AI สแกนสลิปสำเร็จ! เติมหมวดหมู่ให้อัตโนมัติ';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -201,6 +204,251 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
         ),
       );
     }
+  }
+
+  void _showCalculatorDialog() {
+    String calcDisplay = _amountController.text.trim();
+    if (calcDisplay.isEmpty) calcDisplay = '0';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setCalcState) {
+          void onBtnPress(String val) {
+            setCalcState(() {
+              if (val == 'C') {
+                calcDisplay = '0';
+              } else if (val == '⌫') {
+                if (calcDisplay.length > 1) {
+                  calcDisplay = calcDisplay.substring(0, calcDisplay.length - 1);
+                } else {
+                  calcDisplay = '0';
+                }
+              } else if (val == '=') {
+                try {
+                  final exp = calcDisplay.replaceAll('×', '*').replaceAll('÷', '/');
+                  calcDisplay = _evaluateExpression(exp).toStringAsFixed(2);
+                } catch (_) {}
+              } else {
+                if (calcDisplay == '0' && val != '.' && val != '+' && val != '-' && val != '×' && val != '÷') {
+                  calcDisplay = val;
+                } else {
+                  calcDisplay += val;
+                }
+              }
+            });
+          }
+
+          final buttons = [
+            'C', '⌫', '÷', '×',
+            '7', '8', '9', '-',
+            '4', '5', '6', '+',
+            '1', '2', '3', '=',
+            '0', '.', '00', 'OK'
+          ];
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.calculate, color: AppColors.primary),
+                SizedBox(width: 8),
+                Text('เครื่องคิดเลขคำนวณบิล 🧮', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  alignment: Alignment.centerRight,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    reverse: true,
+                    child: Text(
+                      calcDisplay,
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    childAspectRatio: 1.3,
+                    crossAxisSpacing: 6,
+                    mainAxisSpacing: 6,
+                  ),
+                  itemCount: buttons.length,
+                  itemBuilder: (context, index) {
+                    final btn = buttons[index];
+                    final isOp = ['+', '-', '×', '÷', '='].contains(btn);
+                    final isAction = ['C', '⌫', 'OK'].contains(btn);
+
+                    return ElevatedButton(
+                      onPressed: () {
+                        if (btn == 'OK') {
+                          try {
+                            final exp = calcDisplay.replaceAll('×', '*').replaceAll('÷', '/');
+                            final val = _evaluateExpression(exp);
+                            _amountController.text = val.toStringAsFixed(2);
+                          } catch (_) {
+                            _amountController.text = calcDisplay;
+                          }
+                          Navigator.of(ctx).pop();
+                        } else {
+                          onBtnPress(btn);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: btn == 'OK'
+                            ? AppColors.primary
+                            : (isOp ? Colors.pink.shade100 : (isAction ? Colors.grey.shade200 : Colors.white)),
+                        foregroundColor: btn == 'OK' ? Colors.white : (isOp ? AppColors.primary : Colors.black),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: Text(btn, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    );
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  double _evaluateExpression(String expr) {
+    expr = expr.replaceAll(' ', '');
+    final parts = expr.split(RegExp(r'(?<=[+-])|(?=[+-])'));
+    double total = 0;
+    String currentOp = '+';
+
+    for (var part in parts) {
+      if (part == '+' || part == '-') {
+        currentOp = part;
+      } else {
+        double termVal = _evalMultDiv(part);
+        if (currentOp == '+') total += termVal;
+        if (currentOp == '-') total -= termVal;
+      }
+    }
+    return total;
+  }
+
+  double _evalMultDiv(String term) {
+    final factors = term.split(RegExp(r'(?<=[*/])|(?=[*/])'));
+    double total = double.tryParse(factors[0]) ?? 0;
+    String op = '*';
+
+    for (int i = 1; i < factors.length; i++) {
+      final f = factors[i];
+      if (f == '*' || f == '/') {
+        op = f;
+      } else {
+        final val = double.tryParse(f) ?? 1;
+        if (op == '*') total *= val;
+        if (op == '/') total = val != 0 ? total / val : total;
+      }
+    }
+    return total;
+  }
+
+  void _addSplitItemDialog() {
+    final mainCats = ref.read(mainCategoriesProvider);
+    final subCats = ref.read(subCategoriesProvider);
+    String? tempMainCatId = _selectedMainCategoryId ?? (mainCats.isNotEmpty ? mainCats.first.id : null);
+    String? tempSubCatId = tempMainCatId != null
+        ? subCats.firstWhere((s) => s.mainCategoryId == tempMainCatId, orElse: () => subCats.first).id
+        : null;
+
+    final nameController = TextEditingController();
+    final amountController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSubState) {
+          final filteredSubs = subCats.where((s) => s.mainCategoryId == tempMainCatId).toList();
+
+          return AlertDialog(
+            title: const Text('➕ เพิ่มรายการย่อยในบิลนี้', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'ชื่อรายการ (เช่น ขนม 🍦, น้ำยาซักผ้า 🧹)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'จำนวนเงิน (฿)'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: tempMainCatId,
+                  decoration: const InputDecoration(labelText: 'หมวดหมู่หลัก'),
+                  items: mainCats.map((c) => DropdownMenuItem(value: c.id, child: Text('${c.emoji} ${c.name}'))).toList(),
+                  onChanged: (val) {
+                    setSubState(() {
+                      tempMainCatId = val;
+                      tempSubCatId = subCats.firstWhere((s) => s.mainCategoryId == val, orElse: () => subCats.first).id;
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: tempSubCatId,
+                  decoration: const InputDecoration(labelText: 'หมวดหมู่ย่อย'),
+                  items: filteredSubs.map((s) => DropdownMenuItem(value: s.id, child: Text('${s.emoji} ${s.name}'))).toList(),
+                  onChanged: (val) => setSubState(() => tempSubCatId = val),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('ยกเลิก'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final name = nameController.text.trim();
+                  final amt = double.tryParse(amountController.text.trim()) ?? 0;
+                  if (name.isNotEmpty && amt > 0 && tempMainCatId != null && tempSubCatId != null) {
+                    setState(() {
+                      _splitItems.add({
+                        'name': name,
+                        'amount': amt,
+                        'mainCatId': tempMainCatId,
+                        'subCatId': tempSubCatId,
+                      });
+                      // Recalculate total amount sum
+                      final sum = _splitItems.fold<double>(0, (s, item) => s + (item['amount'] as double));
+                      _amountController.text = sum.toStringAsFixed(2);
+                    });
+                    Navigator.of(ctx).pop();
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                child: const Text('เพิ่มรายการย่อย'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   void _showImagePickerOptions() {
@@ -274,13 +522,15 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
 
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedMainCategoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรุณาเลือกหมวดหมู่หลัก')));
-      return;
-    }
-    if (_selectedSubCategoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรุณาเลือกหมวดหมู่ย่อย')));
-      return;
+    if (!_isSplitBill) {
+      if (_selectedMainCategoryId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรุณาเลือกหมวดหมู่หลัก')));
+        return;
+      }
+      if (_selectedSubCategoryId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรุณาเลือกหมวดหมู่ย่อย')));
+        return;
+      }
     }
     if (_selectedWalletId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรุณาเลือกกระเป๋าเงิน')));
@@ -290,37 +540,64 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     setState(() => _isSaving = true);
 
     try {
-      final amount = double.parse(_amountController.text.trim());
       final isNew = widget.transaction == null;
-      final transactionId = isNew ? const Uuid().v4() : widget.transaction!.id;
       final userProfile = ref.read(userProfileProvider).value;
-
-      final transaction = TransactionItem(
-        id: transactionId,
-        type: _isIncome ? 'income' : 'expense',
-        amount: amount,
-        date: _selectedDate,
-        mainCategoryId: _selectedMainCategoryId!,
-        subCategoryId: _selectedSubCategoryId!,
-        walletId: _selectedWalletId!,
-        note: _noteController.text.trim(),
-        loveNote: _loveNoteController.text.trim().isNotEmpty ? _loveNoteController.text.trim() : null,
-        receiptImageUrl: _existingImageUrl,
-        isTaxDeductible: _isTaxDeductible,
-        createdByUserId: userProfile?.id ?? widget.transaction?.createdByUserId,
-        createdByName: userProfile?.nickname ?? widget.transaction?.createdByName ?? 'ผู้ใช้',
-        createdByPhoto: userProfile?.photoBase64 ?? widget.transaction?.createdByPhoto,
-        createdAt: isNew ? DateTime.now() : widget.transaction!.createdAt,
-        updatedAt: DateTime.now(),
-      );
-
       final notifier = ref.read(rawTransactionsProvider.notifier);
       final storageRepo = ref.read(storageRepositoryProvider);
 
-      if (isNew) {
-        await notifier.addTransaction(transaction, receiptFile: _selectedImageFile, storageRepo: storageRepo);
+      if (_isSplitBill && _splitItems.isNotEmpty) {
+        // Multi-category bill split submission
+        for (var item in _splitItems) {
+          final txId = const Uuid().v4();
+          final tx = TransactionItem(
+            id: txId,
+            type: _isIncome ? 'income' : 'expense',
+            amount: item['amount'] as double,
+            date: _selectedDate,
+            mainCategoryId: item['mainCatId'] as String,
+            subCategoryId: item['subCatId'] as String,
+            walletId: _selectedWalletId!,
+            note: '${item['name']} (สลิปรวมบิล)',
+            loveNote: _loveNoteController.text.trim().isNotEmpty ? _loveNoteController.text.trim() : null,
+            receiptImageUrl: _existingImageUrl,
+            isTaxDeductible: _isTaxDeductible,
+            createdByUserId: userProfile?.id,
+            createdByName: userProfile?.nickname ?? 'ผู้ใช้',
+            createdByPhoto: userProfile?.photoBase64,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+          await notifier.addTransaction(tx, receiptFile: _selectedImageFile, storageRepo: storageRepo);
+        }
       } else {
-        await notifier.updateTransaction(transaction, receiptFile: _selectedImageFile, storageRepo: storageRepo);
+        // Single transaction submission
+        final amount = double.parse(_amountController.text.trim());
+        final transactionId = isNew ? const Uuid().v4() : widget.transaction!.id;
+
+        final transaction = TransactionItem(
+          id: transactionId,
+          type: _isIncome ? 'income' : 'expense',
+          amount: amount,
+          date: _selectedDate,
+          mainCategoryId: _selectedMainCategoryId!,
+          subCategoryId: _selectedSubCategoryId!,
+          walletId: _selectedWalletId!,
+          note: _noteController.text.trim(),
+          loveNote: _loveNoteController.text.trim().isNotEmpty ? _loveNoteController.text.trim() : null,
+          receiptImageUrl: _existingImageUrl,
+          isTaxDeductible: _isTaxDeductible,
+          createdByUserId: userProfile?.id ?? widget.transaction?.createdByUserId,
+          createdByName: userProfile?.nickname ?? widget.transaction?.createdByName ?? 'ผู้ใช้',
+          createdByPhoto: userProfile?.photoBase64 ?? widget.transaction?.createdByPhoto,
+          createdAt: isNew ? DateTime.now() : widget.transaction!.createdAt,
+          updatedAt: DateTime.now(),
+        );
+
+        if (isNew) {
+          await notifier.addTransaction(transaction, receiptFile: _selectedImageFile, storageRepo: storageRepo);
+        } else {
+          await notifier.updateTransaction(transaction, receiptFile: _selectedImageFile, storageRepo: storageRepo);
+        }
       }
 
       if (mounted) {
@@ -361,7 +638,6 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     final wallets = ref.watch(walletsProvider);
     final theme = Theme.of(context);
 
-    // Filter main categories by income/expense type
     final filteredMainCats = mainCats.where((cat) {
       if (_isIncome) {
         return cat.id.contains('income') || cat.name.contains('รายรับ') || cat.name.contains('เงิน');
@@ -370,7 +646,6 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       }
     }).toList();
 
-    // Cascaded subcategories based on selected main category
     final filteredSubCats = subCats.where((sub) => sub.mainCategoryId == _selectedMainCategoryId).toList();
 
     return Scaffold(
@@ -460,11 +735,11 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                     ),
                     const SizedBox(height: 20),
 
-                    // Amount input
+                    // Amount input with Quick Calculator Button 🧮
                     CustomTextField(
                       controller: _amountController,
                       labelText: 'จำนวนเงิน (บาท)',
-                      hintText: '0.00',
+                      hintText: '0.00 หรือพิมพ์นิพจน์คำนวณ เช่น 129+45',
                       prefixWidget: const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -478,16 +753,112 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                           ),
                         ],
                       ),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.calculate, color: AppColors.primary),
+                        tooltip: 'เปิดเครื่องคิดเลขคำนวณบิล 🧮',
+                        onPressed: _showCalculatorDialog,
+                      ),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       validator: (val) {
                         if (val == null || val.trim().isEmpty) return 'กรุณากรอกจำนวนเงิน';
-                        final num = double.tryParse(val);
-                        if (num == null) return 'ตัวเลขไม่ถูกต้อง';
-                        if (num <= 0) return 'จำนวนเงินต้องมากกว่า 0';
+                        try {
+                          final exp = val.replaceAll('×', '*').replaceAll('÷', '/');
+                          final num = _evaluateExpression(exp);
+                          if (num <= 0) return 'จำนวนเงินต้องมากกว่า 0';
+                        } catch (_) {
+                          return 'ตัวเลขหรือนิพจน์ไม่ถูกต้อง';
+                        }
                         return null;
                       },
                     ),
                     const SizedBox(height: 20),
+
+                    // Multi-Category Bill Split Toggle 🔀
+                    SwitchListTile(
+                      title: const Row(
+                        children: [
+                          Icon(Icons.call_split, color: AppColors.primary),
+                          SizedBox(width: 8),
+                          Text('แยกสลิปนี้ออกเป็นหลายหมวดหมู่ 🔀', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ],
+                      ),
+                      subtitle: const Text('สำหรับสลิปซูเปอร์มาร์เก็ต/บิล 1 ใบที่มีของหลายหมวด'),
+                      value: _isSplitBill,
+                      activeColor: AppColors.primary,
+                      onChanged: (val) {
+                        setState(() {
+                          _isSplitBill = val;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Split Items List view (if Split Bill mode active)
+                    if (_isSplitBill) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('รายการย่อยในบิลนี้:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                TextButton.icon(
+                                  onPressed: _addSplitItemDialog,
+                                  icon: const Icon(Icons.add, size: 16),
+                                  label: const Text('➕ เพิ่มรายการย่อย', style: TextStyle(fontSize: 11)),
+                                ),
+                              ],
+                            ),
+                            if (_splitItems.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 8.0),
+                                child: Text('ยังไม่มีรายการย่อย กดปุ่มด้านบนเพื่อแยกหมวดหมู่', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                              )
+                            else
+                              Column(
+                                children: _splitItems.asMap().entries.map((entry) {
+                                  final idx = entry.key;
+                                  final item = entry.value;
+                                  final mainCat = mainCats.firstWhere((c) => c.id == item['mainCatId'], orElse: () => mainCats.first);
+
+                                  return Card(
+                                    margin: const EdgeInsets.symmetric(vertical: 4),
+                                    child: ListTile(
+                                      leading: Text(mainCat.emoji, style: const TextStyle(fontSize: 20)),
+                                      title: Text(item['name'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                      subtitle: Text(mainCat.name, style: const TextStyle(fontSize: 11)),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text('฿${(item['amount'] as double).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete, size: 16, color: AppColors.expense),
+                                            onPressed: () {
+                                              setState(() {
+                                                _splitItems.removeAt(idx);
+                                                final sum = _splitItems.fold<double>(0, (s, i) => s + (i['amount'] as double));
+                                                _amountController.text = sum.toStringAsFixed(2);
+                                              });
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     // Date & Time picker Row
                     Row(
@@ -543,59 +914,60 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                     ),
                     const SizedBox(height: 20),
 
-                    // Main Category Selector dropdown
-                    DropdownButtonFormField<String>(
-                      value: _selectedMainCategoryId,
-                      decoration: const InputDecoration(labelText: 'หมวดหมู่หลัก'),
-                      items: filteredMainCats.map((cat) {
-                        return DropdownMenuItem<String>(
-                          value: cat.id,
-                          child: Row(
-                            children: [
-                              Text(cat.emoji),
-                              const SizedBox(width: 8),
-                              Text(cat.name),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedMainCategoryId = val;
-                          _selectedSubCategoryId = null; // reset subcategory on main change
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
+                    // Main & Sub Category Selector dropdowns (if NOT Split Bill mode)
+                    if (!_isSplitBill) ...[
+                      DropdownButtonFormField<String>(
+                        value: _selectedMainCategoryId,
+                        decoration: const InputDecoration(labelText: 'หมวดหมู่หลัก'),
+                        items: filteredMainCats.map((cat) {
+                          return DropdownMenuItem<String>(
+                            value: cat.id,
+                            child: Row(
+                              children: [
+                                Text(cat.emoji),
+                                const SizedBox(width: 8),
+                                Text(cat.name),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedMainCategoryId = val;
+                            _selectedSubCategoryId = null;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
 
-                    // Sub Category Selector dropdown
-                    DropdownButtonFormField<String>(
-                      value: _selectedSubCategoryId,
-                      decoration: const InputDecoration(labelText: 'หมวดหมู่ย่อย'),
-                      disabledHint: const Text('กรุณาเลือกหมวดหมู่หลักก่อน'),
-                      items: _selectedMainCategoryId == null
-                          ? []
-                          : filteredSubCats.map((sub) {
-                              return DropdownMenuItem<String>(
-                                value: sub.id,
-                                child: Row(
-                                  children: [
-                                    Text(sub.emoji),
-                                    const SizedBox(width: 8),
-                                    Text(sub.name),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                      onChanged: _selectedMainCategoryId == null
-                          ? null
-                          : (val) {
-                              setState(() {
-                                _selectedSubCategoryId = val;
-                              });
-                            },
-                    ),
-                    const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: _selectedSubCategoryId,
+                        decoration: const InputDecoration(labelText: 'หมวดหมู่ย่อย'),
+                        disabledHint: const Text('กรุณาเลือกหมวดหมู่หลักก่อน'),
+                        items: _selectedMainCategoryId == null
+                            ? []
+                            : filteredSubCats.map((sub) {
+                                return DropdownMenuItem<String>(
+                                  value: sub.id,
+                                  child: Row(
+                                    children: [
+                                      Text(sub.emoji),
+                                      const SizedBox(width: 8),
+                                      Text(sub.name),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                        onChanged: _selectedMainCategoryId == null
+                            ? null
+                            : (val) {
+                                setState(() {
+                                  _selectedSubCategoryId = val;
+                                });
+                              },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     // Wallet Selector dropdown
                     DropdownButtonFormField<String>(
@@ -627,13 +999,14 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                     const SizedBox(height: 20),
 
                     // Note field
-                    CustomTextField(
-                      controller: _noteController,
-                      labelText: 'บันทึกข้อความ / หมายเหตุ (ถ้ามี)',
-                      hintText: 'กรอกหมายเหตุ หรือบันทึกเพิ่มเติมที่นี่',
-                      prefixIcon: Icons.notes,
-                      maxLines: 2,
-                    ),
+                    if (!_isSplitBill)
+                      CustomTextField(
+                        controller: _noteController,
+                        labelText: 'บันทึกข้อความ / หมายเหตุ (ถ้ามี)',
+                        hintText: 'กรอกหมายเหตุ หรือบันทึกเพิ่มเติมที่นี่',
+                        prefixIcon: Icons.notes,
+                        maxLines: 2,
+                      ),
                     const SizedBox(height: 16),
 
                     // Love Memory Note field
@@ -751,75 +1124,6 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                                       ),
                                     ],
                                   )),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Quick AI Slip Recognition Buttons
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withOpacity(0.06),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.auto_awesome, color: AppColors.primary, size: 18),
-                              const SizedBox(width: 6),
-                              Text(
-                                'AI ช่วยเลือกหมวดหมู่จากประเภทสลิปโอนเงิน:',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              ActionChip(
-                                avatar: const Text('⚡', style: TextStyle(fontSize: 12)),
-                                label: const Text('สลิปค่าไฟ (PEA)', style: TextStyle(fontSize: 11)),
-                                onPressed: () {
-                                  final mainCats = ref.read(mainCategoriesProvider);
-                                  final cat = mainCats.firstWhere((c) => c.name.contains('ไฟ') || c.name.contains('น้ำ') || c.name.contains('Living'), orElse: () => mainCats.first);
-                                  setState(() {
-                                    _selectedMainCategoryId = cat.id;
-                                    if (_noteController.text.isEmpty) _noteController.text = 'ค่าไฟฟ้าส่วนภูมิภาค';
-                                  });
-                                },
-                              ),
-                              ActionChip(
-                                avatar: const Text('💧', style: TextStyle(fontSize: 12)),
-                                label: const Text('สลิปค่าน้ำ (MWA)', style: TextStyle(fontSize: 11)),
-                                onPressed: () {
-                                  final mainCats = ref.read(mainCategoriesProvider);
-                                  final cat = mainCats.firstWhere((c) => c.name.contains('น้ำ') || c.name.contains('ไฟ') || c.name.contains('Living'), orElse: () => mainCats.first);
-                                  setState(() {
-                                    _selectedMainCategoryId = cat.id;
-                                    if (_noteController.text.isEmpty) _noteController.text = 'ค่าน้ำประปา';
-                                  });
-                                },
-                              ),
-                              ActionChip(
-                                avatar: const Text('🍚', style: TextStyle(fontSize: 12)),
-                                label: const Text('สลิปค่าอาหาร/กาแฟ', style: TextStyle(fontSize: 11)),
-                                onPressed: () {
-                                  final mainCats = ref.read(mainCategoriesProvider);
-                                  final cat = mainCats.firstWhere((c) => c.name.contains('อาหาร') || c.name.contains('กิน') || c.name.contains('Living'), orElse: () => mainCats.first);
-                                  setState(() {
-                                    _selectedMainCategoryId = cat.id;
-                                    if (_noteController.text.isEmpty) _noteController.text = 'ค่าอาหาร/กินดื่ม';
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ],
                       ),
                     ),
                     const SizedBox(height: 32),
