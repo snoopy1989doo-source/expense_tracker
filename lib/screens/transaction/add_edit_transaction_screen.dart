@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
+import 'dart:js' as js;
+import 'dart:js_util' as js_util;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -88,7 +90,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
           _selectedImageBytes = bytes;
           _existingImageUrl = base64Str;
         });
-        _analyzeSlipAndAutoFill(pickedFile.name, bytes);
+        _analyzeSlipAndAutoFill(pickedFile.name, bytes, base64Str);
       }
     } catch (e) {
       if (mounted) {
@@ -99,31 +101,71 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     }
   }
 
-  void _analyzeSlipAndAutoFill(String fileName, Uint8List bytes) {
-    final textToScan = '$fileName ${bytes.length}'.toLowerCase();
+  Future<void> _analyzeSlipAndAutoFill(String fileName, Uint8List bytes, String base64Str) async {
     final mainCats = ref.read(mainCategoriesProvider);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+              SizedBox(width: 12),
+              Text('🤖 AI กำลังสแกนอ่านข้อความและยอดเงินจากสลิป...'),
+            ],
+          ),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+
+    String extractedText = '';
+
+    try {
+      if (js.context.hasProperty('parseSlipOCR')) {
+        final promise = js.context.callMethod('parseSlipOCR', [base64Str]);
+        final result = await js_util.promiseToFuture(promise);
+        extractedText = result.toString();
+      }
+    } catch (e) {
+      debugPrint('OCR JS Exception: $e');
+    }
+
+    final fullTextToScan = '$fileName $extractedText'.toLowerCase();
     String? matchedCategory;
     String? matchedNote;
+    double? matchedAmount;
 
-    if (textToScan.contains('pea') || textToScan.contains('ไฟฟ้า') || textToScan.contains('การไฟฟ้า') || textToScan.contains('electric')) {
-      matchedNote = 'ค่าไฟฟ้า';
+    // Amount extraction regex
+    final amountRegex = RegExp(r'(\d{1,3}(?:,\d{3})*\.\d{2})');
+    final matches = amountRegex.allMatches(extractedText);
+    for (var m in matches) {
+      final parsed = double.tryParse(m.group(1)!.replaceAll(',', ''));
+      if (parsed != null && parsed > 0) {
+        matchedAmount = parsed;
+        break;
+      }
+    }
+
+    if (fullTextToScan.contains('pea') || fullTextToScan.contains('ไฟฟ้า') || fullTextToScan.contains('ภูมิภาค')) {
+      matchedNote = 'ค่าไฟฟ้าส่วนภูมิภาค';
       matchedCategory = mainCats.firstWhere(
         (c) => c.name.contains('ไฟ') || c.name.contains('น้ำ') || c.name.contains('Living'),
         orElse: () => mainCats.first,
       ).id;
-    } else if (textToScan.contains('mwa') || textToScan.contains('pwa') || textToScan.contains('ประปา') || textToScan.contains('การประปา') || textToScan.contains('water')) {
+    } else if (fullTextToScan.contains('mwa') || fullTextToScan.contains('pwa') || fullTextToScan.contains('ประปา')) {
       matchedNote = 'ค่าน้ำประปา';
       matchedCategory = mainCats.firstWhere(
         (c) => c.name.contains('น้ำ') || c.name.contains('ไฟ') || c.name.contains('Living'),
         orElse: () => mainCats.first,
       ).id;
-    } else if (textToScan.contains('true') || textToScan.contains('ais') || textToScan.contains('dtac') || textToScan.contains('3bb') || textToScan.contains('เน็ต')) {
+    } else if (fullTextToScan.contains('true') || fullTextToScan.contains('ais') || fullTextToScan.contains('dtac') || fullTextToScan.contains('เน็ต')) {
       matchedNote = 'ค่าอินเทอร์เน็ต / โทรศัพท์';
       matchedCategory = mainCats.firstWhere(
         (c) => c.name.contains('อินเทอร์เน็ต') || c.name.contains('ไฟ'),
         orElse: () => mainCats.first,
       ).id;
-    } else if (textToScan.contains('อาหาร') || textToScan.contains('ข้าว') || textToScan.contains('cafe') || textToScan.contains('ร้าน') || textToScan.contains('food')) {
+    } else if (fullTextToScan.contains('อาหาร') || fullTextToScan.contains('ข้าว') || fullTextToScan.contains('cafe') || fullTextToScan.contains('ร้าน')) {
       matchedNote = 'ค่าอาหาร/กินดื่ม';
       matchedCategory = mainCats.firstWhere(
         (c) => c.name.contains('อาหาร') || c.name.contains('กิน') || c.name.contains('Living'),
@@ -131,17 +173,28 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       ).id;
     }
 
-    if (matchedCategory != null || matchedNote != null) {
+    if (mounted) {
       setState(() {
-        if (matchedCategory != null) _selectedMainCategoryId = matchedCategory;
+        if (matchedAmount != null) {
+          _amountController.text = matchedAmount.toStringAsFixed(2);
+        }
+        if (matchedCategory != null) {
+          _selectedMainCategoryId = matchedCategory;
+        }
         if (matchedNote != null && _noteController.text.isEmpty) {
           _noteController.text = matchedNote;
         }
       });
+
+      final successMsg = matchedAmount != null
+          ? '✨ AI อ่านสลิปสำเร็จ! พบยอดเงิน ฿${matchedAmount.toStringAsFixed(2)} (${matchedNote ?? "เลือกหมวดหมู่อัตโนมัติ"})'
+          : '✨ AI สแกนสลิปสำเร็จ! เติมหมวดหมู่ให้อัตโนมัติ (สามารถปรับแก้ได้ก่อนบันทึก)';
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✨ AI สแกนสลิปแล้ว: เติมหมวดหมู่ให้อัตโนมัติ (สามารถปรับแก้ได้ก่อนบันทึก)'),
-          duration: Duration(seconds: 4),
+        SnackBar(
+          content: Text(successMsg),
+          backgroundColor: Colors.green.shade700,
+          duration: const Duration(seconds: 4),
         ),
       );
     }

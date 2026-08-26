@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
   <base href="$FLUTTER_BASE_HREF">
@@ -21,6 +21,22 @@
 
   <title>Kapookluxx — แอปรายรับ-รายจ่ายสำหรับคู่รัก</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Tesseract.js OCR for Thai/Eng Bank Slip Text Recognition -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script>
+    window.parseSlipOCR = async function(base64Image) {
+      try {
+        const worker = await Tesseract.createWorker('tha+eng');
+        const ret = await worker.recognize(base64Image);
+        await worker.terminate();
+        return ret.data.text || "";
+      } catch (e) {
+        console.error("OCR Error:", e);
+        return "";
+      }
+    };
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
