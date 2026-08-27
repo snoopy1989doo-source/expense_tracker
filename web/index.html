@@ -29,22 +29,107 @@
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <script>
-    // Strict EMVCo TLV Parser (Tag-Length-Value)
-    function parseEMVCoTags(qrData) {
-      let idx = 0;
-      const tags = {};
-      while (idx < qrData.length - 4) {
-        const tag = qrData.substring(idx, idx + 2);
-        const len = parseInt(qrData.substring(idx + 2, idx + 4), 10);
-        if (isNaN(len) || len < 0 || idx + 4 + len > qrData.length) break;
-        const val = qrData.substring(idx + 4, idx + 4 + len);
-        tags[tag] = val;
-        idx += 4 + len;
+    // PromptParse & ITMX BOT EMVCo Thai Bank Slip Verification Payload Decoder
+    function decodeThaiSlipQR(qrData) {
+      if (!qrData) return null;
+      console.log("🔍 Decoding Raw Slip QR Data:", qrData);
+
+      // 1. Standard EMVCo / PromptPay Tag 54 Amount (e.g. ...5406130.00...)
+      const tag54Match = qrData.match(/54(\d{2})(\d+\.?\d*)/);
+      if (tag54Match) {
+        const len = parseInt(tag54Match[1], 10);
+        if (!isNaN(len) && len > 0 && len <= 12) {
+          const amtStr = tag54Match[2].substring(0, len);
+          const amt = parseFloat(amtStr);
+          if (!isNaN(amt) && amt > 0 && amt < 1000000) {
+            console.log("🎉 Tag 54 Amount Extracted:", amt);
+            return amt;
+          }
+        }
       }
-      return tags;
+
+      // 2. ITMX BOT Slip Verification Payload (Tag 000400000140 / Sub-tag 05 Amount)
+      const itmxMatch = qrData.match(/(?:05|54)(\d{2})(\d+\.?\d*)/);
+      if (itmxMatch) {
+        const len = parseInt(itmxMatch[1], 10);
+        if (!isNaN(len) && len > 0 && len <= 12) {
+          const amtStr = itmxMatch[2].substring(0, len);
+          const amt = parseFloat(amtStr);
+          if (!isNaN(amt) && amt > 0 && amt < 1000000) {
+            console.log("🎉 ITMX Sub-tag Amount Extracted:", amt);
+            return amt;
+          }
+        }
+      }
+
+      // 3. Bank Verification URL Query parameters (e.g. ?amount=130.00 or &amt=130.00)
+      const urlMatch = qrData.match(/(?:amount|amt|val|a)=(\d+\.?\d*)/i);
+      if (urlMatch) {
+        const amt = parseFloat(urlMatch[1]);
+        if (!isNaN(amt) && amt > 0) return amt;
+      }
+
+      return null;
     }
 
-    // High contrast canvas binarization for crisp text extraction from pastel bank slips
+    // Multi-pass Canvas QR Scanner (Full Image + Bottom-Right Quadrant Crop for High-Res Slips)
+    function scanQRMultiPass(img) {
+      if (!window.jsQR) return null;
+
+      // Pass 1: Scan full image canvas
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
+        if (code && code.data) return code.data;
+      } catch (e) {}
+
+      // Pass 2: Crop Bottom-Right 60% Quadrant (Where Thai Bank Slips place mini-QR)
+      try {
+        const cropW = Math.floor(img.width * 0.6);
+        const cropH = Math.floor(img.height * 0.6);
+        const startX = img.width - cropW;
+        const startY = img.height - cropH;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = cropW;
+        canvas.height = cropH;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, startX, startY, cropW, cropH, 0, 0, cropW, cropH);
+        let imageData = ctx.getImageData(0, 0, cropW, cropH);
+        let code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
+        if (code && code.data) {
+          console.log("⚡ QR Code Found in Bottom-Right Quadrant Crop!");
+          return code.data;
+        }
+      } catch (e) {}
+
+      // Pass 3: Crop Bottom-Half 60% Height
+      try {
+        const cropH = Math.floor(img.height * 0.6);
+        const startY = img.height - cropH;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = cropH;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, startY, img.width, cropH, 0, 0, img.width, cropH);
+        let imageData = ctx.getImageData(0, 0, img.width, cropH);
+        let code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
+        if (code && code.data) {
+          console.log("⚡ QR Code Found in Bottom-Half Crop!");
+          return code.data;
+        }
+      } catch (e) {}
+
+      return null;
+    }
+
+    // High Contrast Canvas Binarization for OCR
     function getBinarizedImageBase64(img) {
       try {
         const canvas = document.createElement('canvas');
@@ -72,7 +157,7 @@
     }
 
     window.parseSlipOCR = async function(base64Image) {
-      console.log("⚡ Starting Ultra-High Accuracy Slip Scan...");
+      console.log("⚡ Starting PromptParse Multi-Pass Slip Scan...");
 
       const img = new Image();
       img.src = base64Image;
@@ -81,33 +166,15 @@
         img.onerror = resolve;
       });
 
-      // 1. Ultra-fast QR Code Detection (0.01s Instant Detection)
+      // 1. Multi-Pass QR Code Detection + ITMX / PromptParse Payload Decoder
       try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-        if (window.jsQR) {
-          const code = jsQR(imageData.data, imageData.width, imageData.height);
-          if (code && code.data) {
-            console.log("🎉 Instant QR Code Scanned:", code.data);
-
-            // Locate EMVCo 000201 tag anywhere in QR payload
-            const emvIdx = code.data.indexOf("000201");
-            if (emvIdx !== -1) {
-              const emvPayload = code.data.substring(emvIdx);
-              const tags = parseEMVCoTags(emvPayload);
-              if (tags["54"]) {
-                const amt = parseFloat(tags["54"]);
-                if (!isNaN(amt) && amt > 0 && amt < 1000000) {
-                  console.log("✨ Strict EMVCo Tag 54 Amount Extracted:", amt);
-                  return "จำนวนเงิน " + amt.toFixed(2) + " บาท\n" + code.data;
-                }
-              }
-            }
+        const rawQrData = scanQRMultiPass(img);
+        if (rawQrData) {
+          console.log("🎉 QR Code Found:", rawQrData);
+          const amount = decodeThaiSlipQR(rawQrData);
+          if (amount) {
+            console.log("✨ Extracted Slip Amount from QR Payload:", amount);
+            return "จำนวนเงิน " + amount.toFixed(2) + " บาท\n" + rawQrData;
           }
         }
       } catch (qrErr) {
