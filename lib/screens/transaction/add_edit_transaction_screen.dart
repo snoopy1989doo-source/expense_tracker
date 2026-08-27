@@ -186,27 +186,29 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     String? matchedNote;
     double? matchedAmount;
 
-    // Multi-regex for amount extraction in Thai bank slips
-    final amountRegexes = [
-      RegExp(r'(?:จำนวน(?:เงิน)?|ยอดเงิน|baht|thb|฿)\s*:?\s*(\d{1,6}(?:,\d{3})*(?:\.\d{1,2})?)', caseSensitive: false),
-      RegExp(r'(\d{1,6}(?:,\d{3})*\.\d{2})'),
-      RegExp(r'(\d{1,6}\.\d{2})'),
-    ];
+    // Smart extraction for amounts e.g. 130.00 while ignoring years e.g. 2569, 2026
+    final amountMatches = RegExp(r'(\d{1,6}(?:,\d{3})*(?:\.\d{1,2})?)').allMatches(extractedText);
+    double? foundAmount;
 
-    for (var regex in amountRegexes) {
-      final matches = regex.allMatches(extractedText);
-      for (var m in matches) {
-        final rawStr = m.group(1)?.replaceAll(',', '');
-        if (rawStr != null) {
-          final parsed = double.tryParse(rawStr);
-          if (parsed != null && parsed > 0) {
-            matchedAmount = parsed;
-            break;
-          }
-        }
+    for (var m in amountMatches) {
+      final str = m.group(1)?.replaceAll(',', '');
+      if (str == null) continue;
+      final val = double.tryParse(str);
+      if (val == null || val <= 0) continue;
+
+      // Filter out years e.g. 2569, 2568, 2026, 2025
+      if (val >= 2020 && val <= 2580 && !str.contains('.')) continue;
+
+      // If number has decimal places (e.g. 130.00, 50.00), prioritize it!
+      if (str.contains('.')) {
+        foundAmount = val;
+        break;
+      } else if (foundAmount == null) {
+        foundAmount = val;
       }
-      if (matchedAmount != null) break;
     }
+
+    matchedAmount = foundAmount;
 
     if (fullTextToScan.contains('pea') || fullTextToScan.contains('ไฟฟ้า') || fullTextToScan.contains('ภูมิภาค')) {
       matchedNote = 'ค่าไฟฟ้าส่วนภูมิภาค';
