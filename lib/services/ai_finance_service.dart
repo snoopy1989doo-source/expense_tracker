@@ -24,6 +24,63 @@ class AIPredictionResult {
 }
 
 class AIFinanceService {
+  /// Sanitize user-provided API key from whitespace, quotes, and accidental prefixes
+  static String sanitizeApiKey(String raw) {
+    var key = raw.trim();
+    key = key.replaceAll('"', '').replaceAll("'", "");
+    if (key.toLowerCase().startsWith('key=')) {
+      key = key.substring(4).trim();
+    }
+    if (key.toLowerCase().startsWith('bearer ')) {
+      key = key.substring(7).trim();
+    }
+    return key;
+  }
+
+  /// Test Google Gemini API Key validity
+  static Future<Map<String, dynamic>> testApiKey(String apiKey) async {
+    final cleanKey = sanitizeApiKey(apiKey);
+    if (cleanKey.isEmpty) {
+      return {'success': false, 'message': 'กรุณากรอก API Key ก่อนกดทดสอบครับ'};
+    }
+    try {
+      final url = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$cleanKey',
+      );
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'contents': [
+                {
+                  'role': 'user',
+                  'parts': [
+                    {'text': 'ตอบสั้นๆ ว่าพร้อมใช้งาน'}
+                  ]
+                }
+              ]
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': '✅ เชื่อมต่อ Google Gemini API สำเร็จสมบูรณ์! พร้อมใช้งาน'};
+      } else {
+        final bodyStr = utf8.decode(response.bodyBytes);
+        try {
+          final errJson = jsonDecode(bodyStr);
+          final msg = errJson['error']?['message'] ?? 'Status ${response.statusCode}';
+          return {'success': false, 'message': '❌ เชื่อมต่อไม่สำเร็จ (${response.statusCode}): $msg'};
+        } catch (_) {
+          return {'success': false, 'message': '❌ รหัส API Key ไม่ถูกต้อง (Status ${response.statusCode})'};
+        }
+      }
+    } catch (e) {
+      return {'success': false, 'message': '❌ ไม่สามารถติดต่อ Google API ได้: $e'};
+    }
+  }
+
   /// Asynchronous AI Finance Engine with Google Gemini LLM + Graceful Local Fallback
   static Future<String> answerUserQueryAsync({
     required String query,
@@ -71,7 +128,7 @@ class AIFinanceService {
     );
   }
 
-  /// Direct REST Call to Google Gemini API (Ultra-fast gemini-1.5-flash with timeout)
+  /// Direct REST Call to Google Gemini API (Multi-model support + Clear error reporting)
   static Future<String?> _callGeminiApi({
     required String apiKey,
     required String query,
@@ -82,6 +139,9 @@ class AIFinanceService {
     required String? currentUserName,
     String? partnerName,
   }) async {
+    final cleanKey = sanitizeApiKey(apiKey);
+    if (cleanKey.isEmpty) return null;
+
     final now = DateTime.now();
     final currentMonthTxs = transactions.where((t) {
       return t.date.year == now.year && t.date.month == now.month;
@@ -108,9 +168,10 @@ class AIFinanceService {
     final topSubSummary = topSubList.take(5).map((e) => '${e.key}: ${CurrencyFormatter.format(e.value)}').join(', ');
 
     // System prompt with full family & financial context
-    final systemPrompt = '''
-คุณคือ "AI ที่ปรึกษาการเงินและผู้ช่วยชีวิตคู่" ประจำแอป Kapookluxx
-ข้อมูลบริบทของผู้ใช้และครอบครัว (Real Context):
+    final promptWithContext = '''
+[คำสั่งระบบ: คุณคือ "AI ที่ปรึกษาการเงินและผู้ช่วยชีวิตคู่" ประจำแอป Kapookluxx ตอบคำถามอย่างเป็นธรรมชาติ น่ารัก อบอุ่น และเป็นกันเอง ห้ามตอบเป็นสคริปต์แข็งๆ]
+
+ข้อมูลบริบทชีวิตคู่และครอบครัวจริง (Real Context):
 - ผู้ใช้: ต๋อง (อายุ 23 ปี, ทำงานเป็นช่างไฟฟ้าระบบ Utility ในโรงงาน ฐานเงินเดือน ~12,000-15,000 บาท)
 - แฟนสาว: ฝน (อายุ 23 ปี, เกิด 15 มกราคม 2546)
 - วันครบรอบเป็นแฟนกัน: 17 มกราคม 2566 (คบกันมาแล้ว $daysTogether วัน)
@@ -130,52 +191,72 @@ class AIFinanceService {
 
 แนวทางการตอบ:
 - ตอบเป็นภาษาไทยอย่างอบอุ่น เป็นกันเอง สุภาพ น่ารัก สไตล์ที่ปรึกษาการเงินคู่รักตัวจริง (เรียกผู้ใช้ว่า "ต๋อง" และแฟนว่า "ฝน")
-- ให้คำแนะนำทางการเงินที่สมเหตุสมผล ให้กำลังใจ และเน้นความสุขของชีวิตคู่
+- ตอบคำถามทุกหัวข้อ (ทั้งเรื่องอาหาร, การเงิน, การวางแผนชีวิต, วันสำคัญ, กำลังใจ หรือเรื่องทั่วไป) อย่างมีชีวิตชีวาและสร้างสรรค์
 - ใช้ Emoji ประกอบน่ารักๆ จัดรูปแบบ Markdown ให้อ่านง่าย
-- กระชับ ตรงประเด็น หากเป็นการปรึกษาทั่วไปให้ตอบอย่างสร้างสรรค์และมีเหตุผล
+
+คำถามจากต๋อง:
+$query
 ''';
 
-    final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey',
-    );
+    final models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
 
-    final requestBody = jsonEncode({
-      'contents': [
-        {
-          'role': 'user',
-          'parts': [
-            {'text': query}
-          ]
+    for (final model in models) {
+      try {
+        final url = Uri.parse(
+          'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$cleanKey',
+        );
+
+        final requestBody = jsonEncode({
+          'contents': [
+            {
+              'role': 'user',
+              'parts': [
+                {'text': promptWithContext}
+              ]
+            }
+          ],
+          'generationConfig': {
+            'temperature': 0.8,
+            'maxOutputTokens': 1000,
+          }
+        });
+
+        final response = await http
+            .post(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: requestBody,
+            )
+            .timeout(const Duration(seconds: 10));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(utf8.decode(response.bodyBytes));
+          final candidates = data['candidates'] as List?;
+          if (candidates != null && candidates.isNotEmpty) {
+            final content = candidates[0]['content'];
+            final parts = content['parts'] as List?;
+            if (parts != null && parts.isNotEmpty) {
+              final text = parts[0]['text'] as String?;
+              if (text != null && text.trim().isNotEmpty) {
+                return text.trim();
+              }
+            }
+          }
+        } else {
+          final bodyStr = utf8.decode(response.bodyBytes);
+          debugPrint('🚨 Gemini API [$model] Error ${response.statusCode}: $bodyStr');
+          if (response.statusCode == 400 || response.statusCode == 403) {
+            try {
+              final errJson = jsonDecode(bodyStr);
+              final errMsg = errJson['error']?['message'] ?? 'API Key ไม่ถูกต้อง';
+              return '⚠️ **Google Gemini แจ้งเตือน (${response.statusCode}):**\n$errMsg\n\n👉 *กรุณากดไอคอนกุญแจ 🔑 ด้านบนเพื่อตรวจเช็กหรือวาง API Key จาก Google AI Studio ใหม่อีกครั้งครับ*';
+            } catch (_) {
+              return '⚠️ **รหัส API Key ไม่ถูกต้อง (Status ${response.statusCode})**\n\n👉 *กรุณากดไอคอนกุญแจ 🔑 เพื่อตรวจเช็ก API Key ครับ*';
+            }
+          }
         }
-      ],
-      'systemInstruction': {
-        'parts': [
-          {'text': systemPrompt}
-        ]
-      },
-      'generationConfig': {
-        'temperature': 0.7,
-        'maxOutputTokens': 800,
-      }
-    });
-
-    final response = await http
-        .post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: requestBody,
-        )
-        .timeout(const Duration(seconds: 8));
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      final candidates = data['candidates'] as List?;
-      if (candidates != null && candidates.isNotEmpty) {
-        final content = candidates[0]['content'];
-        final parts = content['parts'] as List?;
-        if (parts != null && parts.isNotEmpty) {
-          return parts[0]['text'] as String?;
-        }
+      } catch (e) {
+        debugPrint('Gemini model $model exception: $e');
       }
     }
     return null;
@@ -436,25 +517,44 @@ class AIFinanceService {
           '${netBalance >= 0 ? "เก่งมากครับ! เดือนนี้คุมงบได้ดีเยี่ยม มีเงินเหลือออมด้วยนะ 💕" : "เดือนนี้รายจ่ายค่อนข้างสูง ลองช่วยกันคุมงบมื้อเย็นเพิ่มเติมดูนะครับ ✌️"}';
     }
 
-    // 7. Query: Predictions
-    if (cleanQuery.contains('ทำนาย') || cleanQuery.contains('ล่วงหน้า') || cleanQuery.contains('อนาคต')) {
-      final predictions = predictUpcomingExpenses(transactions);
-      final buffer = StringBuffer('🔮 **ผลวิเคราะห์ทำนายบิลล่วงหน้าของ AI:**\n\n');
-      for (var p in predictions) {
-        buffer.write('${p.iconEmoji} **${p.title}:** ${p.description}\n\n');
-      }
-      return buffer.toString();
+    // 8. Query: Food & Meals (กินอะไรดี / หิว / เมนู)
+    if (cleanQuery.contains('กิน') || cleanQuery.contains('อาหาร') || cleanQuery.contains('หิว') || cleanQuery.contains('เมนู') || cleanQuery.contains('มื้อ')) {
+      final foodIdeas = [
+        '🍲 **เมนูคู่รักประหยัดงบ & อบอุ่น:** ชวนฝนทำ "สุกี้หม้อรวม / ผัดกะเพราไข่ดาวคู่" กินที่ห้องด้วยกัน ทั้งสนุก อิ่มอร่อย และช่วยคุมงบการเงินได้ดีมากครับ! 🍳',
+        '🥘 **เมนูแนะนำวันนี้:** ข้าวไข่ข้นกุ้ง / ข้าวผัดโบราณ ทำง่าย อิ่มอร่อย หรือจะออกไปกินก๋วยเตี๋ยวต้มยำร้านโปรดแถวบ้านคนละชามก็ได้นะคร้าบ 🍜',
+        '🥩 **ไอเดียพิเศษ:** ถ้าอยากให้รางวัลตัวเองช่วงเงินเดือนออก ลองชวนฝนไปกินหมูกระทะ / ชาบูบุฟเฟต์สักมื้อ เติมพลังให้ชีวิตคู่มีความสุขเต็มร้อยครับ! 💕',
+        '🎡 **คิดไม่ออกใช่ไหม?** ลองใช้ฟีเจอร์ **"วงล้อสุ่มอาหารคู่รัก"** ในแท็บคู่รัก ให้ระบบช่วยหมุนตัดสินใจเลือกมื้ออร่อยให้ต๋องกับฝนได้เลยครับ! 🎯',
+      ];
+      final seed = (now.day * 7 + now.hour + cleanQuery.length) % foodIdeas.length;
+      return '🍱 **แนะนำเมนูอาหารสำหรับต๋อง & ฝน:**\n\n${foodIdeas[seed]}\n\n💡 *ทริกการเงิน:* คุมงบค่าอาหารวันละ ~150-200 บาท ช่วยให้ต๋องเก็บเงินดาวน์ BMW และปลดหนี้ให้แม่ได้เร็วขึ้นแน่นอนครับ! 🚗✨';
+    }
+
+    // 9. Query: BMW / Down payment / Family Goals
+    if (cleanQuery.contains('bmw') || cleanQuery.contains('รถ') || cleanQuery.contains('ดาวน์')) {
+      return '🚗💨 **แผนการออมเงินดาวน์ BMW ของต๋อง:**\n\n'
+          '• 🎯 **เป้าหมายเงินดาวน์:** **260,000 บาท** (เพื่อผ่อนสบายๆ ไม่ตึงมือ)\n'
+          '• 💖 **จุดประสงค์:** พาคุณแม่และน้องฝนไปเที่ยวเปิดหูเปิดตาอย่างมีความสุข\n'
+          '• 💡 **กลยุทธ์:** เคลียร์หนี้คุณแม่ 50,000 บาทให้จบเป็น Priority 1 จากนั้นโฟกัสหยอดกระปุก BMW เต็มกำลังครับ สู้ๆ นะครับต๋องทำได้แน่นอน! ✌️🔥';
+    }
+
+    // 10. Query: Baan Duad Shop & Cafe for Fon
+    if (cleanQuery.contains('บ้านดวด') || cleanQuery.contains('ร้านชำ') || cleanQuery.contains('ร้านค้า') || cleanQuery.contains('คาเฟ่') || cleanQuery.contains('น้ำชง')) {
+      return '🏪☕ **โปรเจกต์ร้านของชำบ้านดวด & คาเฟ่น้ำชงของฝน:**\n\n'
+          '• 📍 **พิกัด:** ต.สวนแตง อ.ละแม จ.ชุมพร\n'
+          '• 💡 **ไอเดียธุรกิจ:** เปิดมุมร้านน้ำชง ชาไทย กาแฟโบราณ สมูทตี้ ให้ฝนดูแลสร้างรายได้เข้าครอบครัว\n'
+          '• 🎯 **ความคืบหน้า:** สะสมทุนหมุนเวียนและอุปกรณ์ตั้งต้นไปทีละขั้น เป็นรากฐานสร้างอนาคตชีวิตคู่ที่มั่นคงมากๆ ครับ! 🌸✨';
     }
 
     // Default friendly response
     return '🤖 **สวัสดีครับต๋อง & ฝน! ผมคือ AI ที่ปรึกษาการเงินคู่รัก Kapookluxx** 💕\n\n'
         'เดือนนี้คู่ของเราใช้จ่ายรวม **${CurrencyFormatter.format(totalExpense)}** '
         'สามารถถามผมเพิ่มเติมได้เลยครับ เช่น:\n'
+        '• *"พรุ่งนี้กินอะไรดี?"* 🍱\n'
         '• *"วันสำคัญของคู่เรา"* 💖\n'
         '• *"ค่าใช้จ่ายน้องแมว (กังฟู & โอเลี้ยง)"* 🐱\n'
+        '• *"เป้าหมายเก็บเงินดาวน์ BMW"* 🚗\n'
         '• *"หมวดย่อยใช้อะไรเยอะสุด?"* 🏷️\n'
-        '• *"เช็กสถานะงบประมาณหมวดย่อย"* 🎯\n'
-        '• *"ใครจ่ายเงินมากกว่ากันในเดือนนี้?"* 👫';
+        '• *"เช็กสถานะงบประมาณหมวดย่อย"* 🎯';
   }
 
   /// AI Expense Predictor Engine
