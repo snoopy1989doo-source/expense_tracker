@@ -168,4 +168,36 @@ class CoupleRepository {
       'customQuests': quests,
     }, SetOptions(merge: true));
   }
+
+  /// Set or update budget for a specific subcategory (Option A)
+  Future<void> setSubcategoryBudget(String roomId, String subCatId, double amount) async {
+    if (!_isAvailable) return;
+    await _firestore!.collection('couple_rooms').doc(roomId).set({
+      'subcategoryBudgets.$subCatId': amount,
+    }, SetOptions(merge: true));
+  }
+
+  /// Remove budget tracking for a specific subcategory
+  Future<void> removeSubcategoryBudget(String roomId, String subCatId) async {
+    if (!_isAvailable) return;
+    await _firestore!.collection('couple_rooms').doc(roomId).update({
+      'subcategoryBudgets.$subCatId': FieldValue.delete(),
+    });
+  }
+
+  /// Add a default food to deleted blacklist
+  Future<void> addDeletedDefaultFood(String roomId, String foodName) async {
+    if (!_isAvailable) return;
+    await _firestore!.collection('couple_rooms').doc(roomId).set({
+      'deletedDefaultFood': FieldValue.arrayUnion([foodName]),
+    }, SetOptions(merge: true));
+  }
+
+  /// Add a default quest to deleted blacklist
+  Future<void> addDeletedDefaultQuest(String roomId, String questTitle) async {
+    if (!_isAvailable) return;
+    await _firestore!.collection('couple_rooms').doc(roomId).set({
+      'deletedDefaultQuests': FieldValue.arrayUnion([questTitle]),
+    }, SetOptions(merge: true));
+  }
 }

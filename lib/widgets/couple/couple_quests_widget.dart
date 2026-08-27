@@ -161,24 +161,26 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
                   ),
                 ),
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: activeQuests.length,
-                    itemBuilder: (context, index) {
-                      final q = activeQuests[index];
-                      final isDefault = _defaultQuests.any((d) => d['title'] == q['title']);
+                  child: activeQuests.isEmpty
+                      ? const Center(
+                          child: Text('ยังไม่มีภารกิจคู่รัก กดปุ่มด้านล่างเพื่อเพิ่มภารกิจใหม่ 💕', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: activeQuests.length,
+                          itemBuilder: (context, index) {
+                            final q = activeQuests[index];
+                            final isDefault = _defaultQuests.any((d) => d['title'] == q['title']);
 
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        child: ListTile(
-                          title: Text(q['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          subtitle: Text(
-                            q['desc'] ?? '',
-                            style: TextStyle(fontSize: 11, color: isDefault ? Colors.grey : AppColors.primary),
-                          ),
-                          trailing: isDefault
-                              ? null
-                              : Row(
+                            return Card(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              child: ListTile(
+                                title: Text(q['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                subtitle: Text(
+                                  q['desc'] ?? '',
+                                  style: TextStyle(fontSize: 11, color: isDefault ? Colors.grey : AppColors.primary),
+                                ),
+                                trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     IconButton(
@@ -192,23 +194,30 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
                                       onPressed: () async {
                                         final roomId = ref.read(coupleRoomIdProvider);
                                         if (roomId != null) {
-                                          await ref.read(coupleRepositoryProvider).removeCustomQuestFromRoom(roomId, q);
+                                          if (isDefault) {
+                                            await ref.read(coupleRepositoryProvider).addDeletedDefaultQuest(roomId, q['title']!);
+                                          } else {
+                                            await ref.read(coupleRepositoryProvider).removeCustomQuestFromRoom(roomId, q);
+                                          }
                                         }
                                         setState(() {
                                           _localCustomQuests.removeWhere((item) => item['title'] == q['title']);
+                                          _defaultQuests.removeWhere((item) => item['title'] == q['title']);
                                         });
                                         setSheetState(() {});
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('🗑️ ลบภารกิจ "${q['title']}" สำเร็จ')),
-                                        );
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('🗑️ ลบภารกิจ "${q['title']}" สำเร็จ')),
+                                          );
+                                        }
                                       },
                                     ),
                                   ],
                                 ),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -236,6 +245,7 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
   }
 
   void _editQuestDialog(Map<String, String> oldQuest, String? roomId) {
+    final isDefault = _defaultQuests.any((d) => d['title'] == oldQuest['title']);
     final titleController = TextEditingController(text: oldQuest['title']?.replaceAll('💕 ', ''));
     final descController = TextEditingController(text: oldQuest['desc']);
 
@@ -274,10 +284,15 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
                   'reward': '💖 +15 คะแนนความรัก',
                 };
                 if (roomId != null) {
-                  await ref.read(coupleRepositoryProvider).removeCustomQuestFromRoom(roomId, oldQuest);
+                  if (isDefault) {
+                    await ref.read(coupleRepositoryProvider).addDeletedDefaultQuest(roomId, oldQuest['title']!);
+                  } else {
+                    await ref.read(coupleRepositoryProvider).removeCustomQuestFromRoom(roomId, oldQuest);
+                  }
                   await ref.read(coupleRepositoryProvider).addCustomQuestToRoom(roomId, newItem);
                 }
                 setState(() {
+                  _defaultQuests.removeWhere((item) => item['title'] == oldQuest['title']);
                   _localCustomQuests.removeWhere((item) => item['title'] == oldQuest['title']);
                   _localCustomQuests.add(newItem);
                 });
@@ -301,23 +316,32 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final coupleRoom = ref.watch(coupleRoomProvider).value;
+    final deletedTitles = coupleRoom?.deletedDefaultQuests ?? [];
 
     final Map<String, Map<String, String>> uniqueQuests = {};
     for (var q in _defaultQuests) {
-      uniqueQuests[q['title']!] = q;
+      if (!deletedTitles.contains(q['title'])) {
+        uniqueQuests[q['title']!] = q;
+      }
     }
     for (var q in _localCustomQuests) {
-      uniqueQuests[q['title']!] = q;
+      if (!deletedTitles.contains(q['title'])) {
+        uniqueQuests[q['title']!] = q;
+      }
     }
     if (coupleRoom != null) {
       for (var q in coupleRoom.customQuests) {
-        uniqueQuests[q['title']!] = q;
+        if (!deletedTitles.contains(q['title'])) {
+          uniqueQuests[q['title']!] = q;
+        }
       }
     }
 
     final activeQuests = uniqueQuests.values.toList();
-    final dayIndex = DateTime.now().day % activeQuests.length;
-    final currentQuest = activeQuests[dayIndex];
+    final dayIndex = activeQuests.isNotEmpty ? (DateTime.now().day % activeQuests.length) : 0;
+    final currentQuest = activeQuests.isNotEmpty
+        ? activeQuests[dayIndex]
+        : {'title': '💕 เพิ่มภารกิจความรักคู่เรา', 'desc': 'กดปุ่มด้านล่างเพื่อเพิ่มภารกิจประจำวันกับแฟน'};
 
     return Card(
       child: Padding(

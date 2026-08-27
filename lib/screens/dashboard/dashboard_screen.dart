@@ -17,6 +17,7 @@ import '../../widgets/couple/couple_quests_widget.dart';
 import '../../widgets/couple/food_decision_wheel_dialog.dart';
 import '../../widgets/couple/couple_savings_widget.dart';
 import '../../widgets/couple/couple_calendar_dialog.dart';
+import '../../widgets/budget/subcategory_budget_widget.dart';
 import '../../models/transaction_item.dart';
 import '../transaction/add_edit_transaction_screen.dart';
 
@@ -255,6 +256,10 @@ class DashboardScreen extends ConsumerWidget {
 
                 // Couple Shared Savings Pot Widget (🐷)
                 const CoupleSavingsWidget(),
+                const SizedBox(height: 20),
+
+                // Subcategory Budgets Widget (🎯 Option A)
+                const SubcategoryBudgetWidget(),
                 const SizedBox(height: 20),
 
                 // Couple Quests & Horoscope Card

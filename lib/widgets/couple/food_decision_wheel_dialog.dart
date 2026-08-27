@@ -171,25 +171,27 @@ class _FoodDecisionWheelDialogState extends ConsumerState<FoodDecisionWheelDialo
                   ),
                 ),
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: activeMenu.length,
-                    itemBuilder: (context, index) {
-                      final food = activeMenu[index];
-                      final isDefault = _defaultFoodMenu.any((d) => d['name'] == food['name']);
+                  child: activeMenu.isEmpty
+                      ? const Center(
+                          child: Text('ยังไม่มีเมนูอาหาร กดปุ่มด้านล่างเพื่อเพิ่มเมนูใหม่ 🍱', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: activeMenu.length,
+                          itemBuilder: (context, index) {
+                            final food = activeMenu[index];
+                            final isDefault = _defaultFoodMenu.any((d) => d['name'] == food['name']);
 
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        child: ListTile(
-                          leading: Text(food['emoji'] ?? '🍱', style: const TextStyle(fontSize: 24)),
-                          title: Text(food['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          subtitle: Text(
-                            isDefault ? 'เมนูเริ่มต้นของระบบ' : 'เมนูพิเศษคู่รักของคุณ (ซิงก์ Firebase)',
-                            style: TextStyle(fontSize: 11, color: isDefault ? Colors.grey : AppColors.primary),
-                          ),
-                          trailing: isDefault
-                              ? null
-                              : Row(
+                            return Card(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              child: ListTile(
+                                leading: Text(food['emoji'] ?? '🍱', style: const TextStyle(fontSize: 24)),
+                                title: Text(food['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                subtitle: Text(
+                                  isDefault ? 'เมนูเริ่มต้นของระบบ' : 'เมนูพิเศษคู่รักของคุณ (ซิงก์ Firebase)',
+                                  style: TextStyle(fontSize: 11, color: isDefault ? Colors.grey : AppColors.primary),
+                                ),
+                                trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     IconButton(
@@ -203,23 +205,30 @@ class _FoodDecisionWheelDialogState extends ConsumerState<FoodDecisionWheelDialo
                                       onPressed: () async {
                                         final roomId = ref.read(coupleRoomIdProvider);
                                         if (roomId != null) {
-                                          await ref.read(coupleRepositoryProvider).removeCustomFoodFromRoom(roomId, food);
+                                          if (isDefault) {
+                                            await ref.read(coupleRepositoryProvider).addDeletedDefaultFood(roomId, food['name']!);
+                                          } else {
+                                            await ref.read(coupleRepositoryProvider).removeCustomFoodFromRoom(roomId, food);
+                                          }
                                         }
                                         setState(() {
+                                          _defaultFoodMenu.removeWhere((item) => item['name'] == food['name']);
                                           _localCustomMenu.removeWhere((item) => item['name'] == food['name']);
                                         });
                                         setSheetState(() {});
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('🗑️ ลบเมนู "${food['name']}" สำเร็จ')),
-                                        );
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('🗑️ ลบเมนู "${food['name']}" สำเร็จ')),
+                                          );
+                                        }
                                       },
                                     ),
                                   ],
                                 ),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -247,6 +256,7 @@ class _FoodDecisionWheelDialogState extends ConsumerState<FoodDecisionWheelDialo
   }
 
   void _editFoodDialog(Map<String, String> oldFood, String? roomId) {
+    final isDefault = _defaultFoodMenu.any((d) => d['name'] == oldFood['name']);
     final nameController = TextEditingController(text: oldFood['name']);
     final emojiController = TextEditingController(text: oldFood['emoji']);
 
@@ -281,10 +291,15 @@ class _FoodDecisionWheelDialogState extends ConsumerState<FoodDecisionWheelDialo
               if (newName.isNotEmpty) {
                 final newItem = {'name': newName, 'emoji': newEmoji};
                 if (roomId != null) {
-                  await ref.read(coupleRepositoryProvider).removeCustomFoodFromRoom(roomId, oldFood);
+                  if (isDefault) {
+                    await ref.read(coupleRepositoryProvider).addDeletedDefaultFood(roomId, oldFood['name']!);
+                  } else {
+                    await ref.read(coupleRepositoryProvider).removeCustomFoodFromRoom(roomId, oldFood);
+                  }
                   await ref.read(coupleRepositoryProvider).addCustomFoodToRoom(roomId, newItem);
                 }
                 setState(() {
+                  _defaultFoodMenu.removeWhere((item) => item['name'] == oldFood['name']);
                   _localCustomMenu.removeWhere((item) => item['name'] == oldFood['name']);
                   _localCustomMenu.add(newItem);
                 });
@@ -328,17 +343,24 @@ class _FoodDecisionWheelDialogState extends ConsumerState<FoodDecisionWheelDialo
   @override
   Widget build(BuildContext context) {
     final coupleRoom = ref.watch(coupleRoomProvider).value;
+    final deletedNames = coupleRoom?.deletedDefaultFood ?? [];
 
     final Map<String, Map<String, String>> uniqueMenu = {};
     for (var f in _defaultFoodMenu) {
-      uniqueMenu['${f['emoji']}_${f['name']}'] = f;
+      if (!deletedNames.contains(f['name'])) {
+        uniqueMenu['${f['emoji']}_${f['name']}'] = f;
+      }
     }
     for (var f in _localCustomMenu) {
-      uniqueMenu['${f['emoji']}_${f['name']}'] = f;
+      if (!deletedNames.contains(f['name'])) {
+        uniqueMenu['${f['emoji']}_${f['name']}'] = f;
+      }
     }
     if (coupleRoom != null) {
       for (var f in coupleRoom.customFoodMenu) {
-        uniqueMenu['${f['emoji']}_${f['name']}'] = f;
+        if (!deletedNames.contains(f['name'])) {
+          uniqueMenu['${f['emoji']}_${f['name']}'] = f;
+        }
       }
     }
 

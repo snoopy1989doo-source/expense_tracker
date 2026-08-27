@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/couple_provider.dart';
 import '../../services/ai_finance_service.dart';
 import '../../core/constants/app_colors.dart';
 
@@ -33,7 +34,7 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
     _messages.add({
       'sender': 'ai',
       'text': '🤖 **สวัสดีครับ! ผมคือ AI ที่ปรึกษาการเงินคู่รัก Kapookluxx** 💕\n\n'
-          'มีอะไรให้ผมช่วยสรุปหรือวิเคราะห์ข้อมูลการเงินของคู่คุณในวันนี้ไหมครับ?'
+          'มีอะไรให้ผมช่วยสรุป วิเคราะห์หมวดย่อย หรือตรวจเช็กงบประมาณของคู่คุณในวันนี้ไหมครับ?'
     });
   }
 
@@ -55,13 +56,19 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
 
     final transactions = ref.read(rawTransactionsProvider);
     final categories = ref.read(mainCategoriesProvider);
+    final subCategories = ref.read(subCategoriesProvider);
+    final subcategoryBudgets = ref.read(subcategoryBudgetsProvider);
     final userProfile = ref.read(userProfileProvider).value;
+    final partnerProfile = ref.read(partnerProfileProvider).value;
 
     final aiReply = AIFinanceService.answerUserQuery(
       query: userMsg,
       transactions: transactions,
       categories: categories,
+      subCategories: subCategories,
+      subcategoryBudgets: subcategoryBudgets,
       currentUserName: userProfile?.nickname,
+      partnerName: partnerProfile?.nickname,
     );
 
     setState(() {
@@ -112,7 +119,7 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       Text(
-                        'ถาม-ตอบข้อมูลการเงิน และวิเคราะห์งบประหยัดคู่รัก',
+                        'ถาม-ตอบข้อมูลการเงิน วิเคราะห์หมวดย่อย และคุมงบประหยัดคู่รัก',
                         style: TextStyle(fontSize: 11, color: Colors.grey),
                       ),
                     ],
@@ -174,23 +181,30 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
                 ActionChip(
-                  label: const Text('📊 ใช้เงินหมวดอะไรเยอะสุด?', style: TextStyle(fontSize: 11)),
+                  avatar: const Icon(Icons.category, size: 14, color: AppColors.primary),
+                  label: const Text('🏷️ หมวดย่อยใช้อะไรเยอะสุด?', style: TextStyle(fontSize: 11)),
+                  onPressed: () => _sendMessage('หมวดย่อยใช้อะไรเยอะสุด'),
+                ),
+                const SizedBox(width: 6),
+                ActionChip(
+                  avatar: const Icon(Icons.track_changes, size: 14, color: AppColors.primary),
+                  label: const Text('🎯 เช็กสถานะงบหมวดย่อย', style: TextStyle(fontSize: 11)),
+                  onPressed: () => _sendMessage('เช็กสถานะงบประมาณหมวดย่อย'),
+                ),
+                const SizedBox(width: 6),
+                ActionChip(
+                  label: const Text('📊 สรุปหมวดหลัก', style: TextStyle(fontSize: 11)),
                   onPressed: () => _sendMessage('ใช้เงินหมวดอะไรเยอะสุด'),
                 ),
                 const SizedBox(width: 6),
                 ActionChip(
-                  label: const Text('💰 เดือนนี้เราใช้เงินเท่าไหร่?', style: TextStyle(fontSize: 11)),
-                  onPressed: () => _sendMessage('เดือนนี้เราใช้เงินเท่าไหร่'),
-                ),
-                const SizedBox(width: 6),
-                ActionChip(
-                  label: const Text('👫 ใครเป็นคนจ่ายเยอะกว่า?', style: TextStyle(fontSize: 11)),
+                  label: const Text('👫 สถิติการจ่ายของคู่เรา', style: TextStyle(fontSize: 11)),
                   onPressed: () => _sendMessage('ใครเป็นคนจ่ายเงินมากกว่ากันในเดือนนี้'),
                 ),
                 const SizedBox(width: 6),
                 ActionChip(
-                  label: const Text('🔮 ทำนายบิลล่วงหน้า', style: TextStyle(fontSize: 11)),
-                  onPressed: () => _sendMessage('ทำนายบิลล่วงหน้า'),
+                  label: const Text('💰 สรุปภาพรวมเดือนนี้', style: TextStyle(fontSize: 11)),
+                  onPressed: () => _sendMessage('เดือนนี้เราใช้เงินเท่าไหร่'),
                 ),
               ],
             ),

@@ -1,8 +1,9 @@
-﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_provider.dart';
 import '../repositories/couple_repository.dart';
 import '../repositories/user_profile_repository.dart';
 import '../models/couple_room.dart';
+import '../models/user_profile.dart';
 
 // ─── Couple Repository Provider ───────────────────────────────────────────────
 
@@ -25,6 +26,30 @@ final coupleRoomProvider = StreamProvider<CoupleRoom?>((ref) {
   if (roomId == null) return Stream.value(null);
   final repo = ref.watch(coupleRepositoryProvider);
   return repo.watchCoupleRoom(roomId);
+});
+
+// ─── Partner Profile Stream Provider ──────────────────────────────────────────
+
+final partnerProfileProvider = StreamProvider<UserProfile?>((ref) {
+  final room = ref.watch(coupleRoomProvider).value;
+  final currentUserId = ref.watch(authStateProvider).value;
+  if (room == null || currentUserId == null) return Stream.value(null);
+
+  final partnerId = room.memberIds.firstWhere(
+    (id) => id != currentUserId,
+    orElse: () => '',
+  );
+  if (partnerId.isEmpty) return Stream.value(null);
+
+  final profileRepo = ref.watch(userProfileRepositoryProvider);
+  return profileRepo.watchUserProfile(partnerId);
+});
+
+// ─── Subcategory Budgets Provider (Option A) ──────────────────────────────────
+
+final subcategoryBudgetsProvider = Provider<Map<String, double>>((ref) {
+  final room = ref.watch(coupleRoomProvider).value;
+  return room?.subcategoryBudgets ?? {};
 });
 
 // ─── Couple Notifier (for setup actions) ─────────────────────────────────────

@@ -16,21 +16,7 @@ class CoupleSavingsWidget extends ConsumerStatefulWidget {
 
 class _CoupleSavingsWidgetState extends ConsumerState<CoupleSavingsWidget> {
   bool _showCompletedSection = true;
-
-  final List<SavingsGoal> _localGoals = [
-    SavingsGoal(
-      id: 'default_1',
-      title: 'ทริปเที่ยวญี่ปุ่น 🇯🇵',
-      targetAmount: 50000,
-      currentAmount: 18500,
-      emoji: '✈️',
-      createdAt: DateTime.now(),
-      contributions: [
-        SavingsContribution(userId: 'u1', userName: 'ต๋องแต่ง', amount: 12000, date: DateTime.now()),
-        SavingsContribution(userId: 'u2', userName: 'แฟน', amount: 6500, date: DateTime.now()),
-      ],
-    ),
-  ];
+  final List<SavingsGoal> _localGoals = [];
 
   void _createGoalDialog() {
     final titleController = TextEditingController();
@@ -212,7 +198,7 @@ class _CoupleSavingsWidgetState extends ConsumerState<CoupleSavingsWidget> {
           ElevatedButton(
             onPressed: () async {
               final roomId = ref.read(coupleRoomIdProvider);
-              if (roomId != null && goal.id.isNotEmpty && !goal.id.startsWith('default_')) {
+              if (roomId != null && goal.id.isNotEmpty) {
                 await ref.read(savingsGoalRepositoryProvider).deleteSavingsGoal(roomId, goal.id);
               }
               setState(() {
@@ -333,8 +319,9 @@ class _CoupleSavingsWidgetState extends ConsumerState<CoupleSavingsWidget> {
     final theme = Theme.of(context);
     final goalsAsync = ref.watch(savingsGoalsStreamProvider);
     final firestoreGoals = goalsAsync.value ?? [];
+    final roomId = ref.watch(coupleRoomIdProvider);
 
-    final allGoals = firestoreGoals.isNotEmpty ? firestoreGoals : _localGoals;
+    final allGoals = roomId != null ? firestoreGoals : _localGoals;
     final activeGoals = allGoals.where((g) => !g.isCompleted).toList();
     final completedGoals = allGoals.where((g) => g.isCompleted).toList();
 

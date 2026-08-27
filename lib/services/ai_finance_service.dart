@@ -1,5 +1,6 @@
 import '../models/transaction_item.dart';
 import '../models/main_category.dart';
+import '../models/sub_category.dart';
 import '../core/utils/currency_formatter.dart';
 
 class AIPredictionResult {
@@ -19,12 +20,15 @@ class AIPredictionResult {
 }
 
 class AIFinanceService {
-  /// AI Finance Assistant Chat Engine
+  /// AI Finance Assistant Chat Engine (Deep Subcategories + Dynamic Learning)
   static String answerUserQuery({
     required String query,
     required List<TransactionItem> transactions,
     required List<MainCategory> categories,
+    required List<SubCategory> subCategories,
+    required Map<String, double> subcategoryBudgets,
     required String? currentUserName,
+    String? partnerName,
   }) {
     final cleanQuery = query.toLowerCase().trim();
     final now = DateTime.now();
@@ -41,35 +45,180 @@ class AIFinanceService {
     final totalIncome = income.fold(0.0, (sum, t) => sum + t.amount);
     final netBalance = totalIncome - totalExpense;
 
-    final catMap = {for (var c in categories) c.id: c.name};
+    final mainCatMap = {for (var c in categories) c.id: c};
+    final subCatMap = {for (var s in subCategories) s.id: s};
 
-    // 1. Query: Top spending categories / What category used most money
+    // 0. Query: Subcategories Spending Breakdown (หมวดย่อย)
+    if (cleanQuery.contains('ย่อย') || cleanQuery.contains('หมวดย่อย')) {
+      if (expenses.isEmpty) {
+        return '💕 ในเดือนนี้คู่ของคุณยังไม่มีบันทึกรายจ่ายเข้ามาเลยครับ เริ่มต้นจดบันทึกเพื่อติดตามงบด้วยกันได้เลย!';
+      }
+
+      final Map<String, double> subExpense = {};
+      final Map<String, String> subEmojiMap = {};
+      final Map<String, String> subParentMap = {};
+
+      for (var t in expenses) {
+        String subName;
+        String emoji = '🏷️';
+        String parentName = '';
+
+        if (t.subCategoryId.isNotEmpty && subCatMap.containsKey(t.subCategoryId)) {
+          final sub = subCatMap[t.subCategoryId]!;
+          subName = sub.name;
+          emoji = sub.emoji;
+          final parent = mainCatMap[sub.mainCategoryId];
+          if (parent != null) parentName = parent.name;
+        } else if (t.note != null && t.note!.isNotEmpty) {
+          subName = t.note!;
+          emoji = '📝';
+        } else {
+          final main = mainCatMap[t.mainCategoryId];
+          subName = main?.name ?? 'รายการทั่วไป';
+          emoji = main?.emoji ?? '📄';
+        }
+
+        subExpense[subName] = (subExpense[subName] ?? 0.0) + t.amount;
+        subEmojiMap[subName] = emoji;
+        if (parentName.isNotEmpty) subParentMap[subName] = parentName;
+      }
+
+      final sorted = subExpense.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      final topSub = sorted.first;
+      final topPct = totalExpense > 0 ? (topSub.value / totalExpense * 100).toStringAsFixed(1) : '0';
+
+      final buffer = StringBuffer('📊 **สรุปหมวดย่อยที่คู่คุณใช้เงินเยอะที่สุดประจำเดือนนี้:**\n\n');
+      buffer.write('🏆 **อันดับ 1 (หมวดย่อย):** ${subEmojiMap[topSub.key]} **${topSub.key}** — **${CurrencyFormatter.format(topSub.value)}** ($topPct%)\n');
+      if (subParentMap[topSub.key] != null) {
+        buffer.write('   *(หมวดหลัก: ${subParentMap[topSub.key]})*\n\n');
+      } else {
+        buffer.write('\n');
+      }
+
+      buffer.write('**สัดส่วนตามหมวดย่อยอื่นๆ:**\n');
+      for (var entry in sorted.skip(1).take(5)) {
+        final pct = totalExpense > 0 ? (entry.value / totalExpense * 100).toStringAsFixed(1) : '0';
+        final emoji = subEmojiMap[entry.key] ?? '•';
+        buffer.write('• $emoji **${entry.key}:** ${CurrencyFormatter.format(entry.value)} ($pct%)\n');
+      }
+
+      // Check if any tracked subcategory budget is affected
+      if (subcategoryBudgets.isNotEmpty) {
+        buffer.write('\n🎯 **สถานะงบหมวดย่อยที่กำลังคุม (แบบ A):**\n');
+        for (var b in subcategoryBudgets.entries) {
+          final sCat = subCatMap[b.key];
+          if (sCat != null) {
+            final spentOnCat = subExpense[sCat.name] ?? 0.0;
+            final remaining = b.value - spentOnCat;
+            buffer.write('• ${sCat.emoji} ${sCat.name}: ${CurrencyFormatter.format(spentOnCat)} / ${CurrencyFormatter.format(b.value)} ');
+            if (remaining >= 0) {
+              buffer.write('(คงเหลือ **${CurrencyFormatter.format(remaining)}**)\n');
+            } else {
+              buffer.write('(⚠️ **เกินงบ ${CurrencyFormatter.format(-remaining)}**)\n');
+            }
+          }
+        }
+      }
+
+      return buffer.toString();
+    }
+
+    // 1. Query: Subcategory Budgets Status (เช็กงบประมาณ / คุมงบ)
+    if (cleanQuery.contains('งบ') || cleanQuery.contains('งบประมาณ') || cleanQuery.contains('คุมงบ')) {
+      if (subcategoryBudgets.isEmpty) {
+        return '🎯 **คู่ของคุณยังไม่ได้ตั้งงบหมวดย่อยไว้ครับ**\n\n'
+            '💡 แนะนำ: คุณสามารถกดปุ่ม **"+ ตั้งงบหมวดแรก"** บนการ์ดคุมงบในหน้าหลัก เพื่อเลือกคุมหมวดย่อยที่เงินรั่วไหลง่าย เช่น ชานม/ขนม 🧋, กินหรู/ชาบู 🍲 หรือช้อปปิ้ง 🛒 ได้เลยครับ!';
+      }
+
+      final buffer = StringBuffer('🎯 **รายงานสถานะงบหมวดย่อยของคู่รักประจำเดือนนี้:**\n\n');
+      for (var b in subcategoryBudgets.entries) {
+        final sCat = subCatMap[b.key];
+        final spent = expenses
+            .where((t) => t.subCategoryId == b.key)
+            .fold(0.0, (s, t) => s + t.amount);
+        final budget = b.value;
+        final pct = budget > 0 ? (spent / budget * 100).toStringAsFixed(0) : '0';
+        final remaining = budget - spent;
+
+        final emoji = sCat?.emoji ?? '🏷️';
+        final name = sCat?.name ?? 'หมวดย่อย';
+
+        if (spent > budget) {
+          buffer.write('🔴 $emoji **$name:** ${CurrencyFormatter.format(spent)} / ${CurrencyFormatter.format(budget)} (เกินงบ ${CurrencyFormatter.format(-remaining)} ⚠️)\n');
+        } else if (spent / budget >= 0.7) {
+          buffer.write('🟡 $emoji **$name:** ${CurrencyFormatter.format(spent)} / ${CurrencyFormatter.format(budget)} (ใช้ไป $pct% เหลือ ${CurrencyFormatter.format(remaining)})\n');
+        } else {
+          buffer.write('🟢 $emoji **$name:** ${CurrencyFormatter.format(spent)} / ${CurrencyFormatter.format(budget)} (ใช้ไป $pct% เหลือ ${CurrencyFormatter.format(remaining)})\n');
+        }
+      }
+      return buffer.toString();
+    }
+
+    // 2. Query: Top spending Main categories
     if (cleanQuery.contains('หมวด') || cleanQuery.contains('เยอะสุด') || cleanQuery.contains('กับอะไร') || cleanQuery.contains('อะไรเยอะ')) {
       if (expenses.isEmpty) {
         return '💕 ในเดือนนี้คู่ของคุณยังไม่มีบันทึกรายจ่ายเข้ามาเลยครับ เริ่มต้นจดบันทึกเพื่อติดตามงบด้วยกันได้เลย!';
       }
 
       final Map<String, double> catExpense = {};
+      final Map<String, String> catEmoji = {};
       for (var t in expenses) {
-        final catName = catMap[t.mainCategoryId] ?? 'หมวดหมู่ทั่วไป';
+        final main = mainCatMap[t.mainCategoryId];
+        final catName = main?.name ?? 'หมวดหมู่ทั่วไป';
         catExpense[catName] = (catExpense[catName] ?? 0) + t.amount;
+        catEmoji[catName] = main?.emoji ?? '📁';
       }
 
       final sorted = catExpense.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
       final topCat = sorted.first;
       final topPct = totalExpense > 0 ? (topCat.value / totalExpense * 100).toStringAsFixed(1) : '0';
 
-      final buffer = StringBuffer('📊 **สรุปหมวดหมู่ที่คู่คุณใช้เงินเยอะที่สุดประจำเดือนนี้:**\n\n');
-      buffer.write('🏆 **อันดับ 1:** ${topCat.key} — **${CurrencyFormatter.format(topCat.value)}** ($topPct%)\n\n');
+      final buffer = StringBuffer('📊 **สรุปหมวดหมู่หลักที่คู่คุณใช้เงินเยอะที่สุดประจำเดือนนี้:**\n\n');
+      buffer.write('🏆 **อันดับ 1:** ${catEmoji[topCat.key]} **${topCat.key}** — **${CurrencyFormatter.format(topCat.value)}** ($topPct%)\n\n');
       buffer.write('**สัดส่วนตามหมวดหมู่อื่นๆ:**\n');
       for (var entry in sorted) {
         final pct = totalExpense > 0 ? (entry.value / totalExpense * 100).toStringAsFixed(1) : '0';
-        buffer.write('• ${entry.key}: ${CurrencyFormatter.format(entry.value)} ($pct%)\n');
+        buffer.write('• ${catEmoji[entry.key]} ${entry.key}: ${CurrencyFormatter.format(entry.value)} ($pct%)\n');
       }
       return buffer.toString();
     }
 
-    // 2. Query: Total expenses / Summary
+    // 3. Query: Partner Spending Comparison / Habits
+    if (cleanQuery.contains('ใคร') || cleanQuery.contains('เทียบ') || cleanQuery.contains('จ่ายเยอะ') || cleanQuery.contains('จ่าย') || cleanQuery.contains('นิสัย') || cleanQuery.contains('พฤติกรรม')) {
+      final Map<String, double> partnerExpense = {};
+      final Map<String, Map<String, double>> partnerCatBreakdown = {};
+
+      for (var t in expenses) {
+        final name = (t.createdByName != null && t.createdByName!.isNotEmpty)
+            ? t.createdByName!
+            : (currentUserName ?? 'สมาชิกคู่รัก');
+        partnerExpense[name] = (partnerExpense[name] ?? 0) + t.amount;
+
+        partnerCatBreakdown.putIfAbsent(name, () => {});
+        final catName = mainCatMap[t.mainCategoryId]?.name ?? 'ทั่วไป';
+        partnerCatBreakdown[name]![catName] = (partnerCatBreakdown[name]![catName] ?? 0) + t.amount;
+      }
+
+      if (partnerExpense.isEmpty) {
+        return 'ยังไม่มีข้อมูลการจ่ายเงินของเดือนนี้ครับ';
+      }
+
+      final sorted = partnerExpense.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      final buffer = StringBuffer('👩‍❤️‍👨 **สถิติและพฤติกรรมการจ่ายเงินของคู่เรา (AI Dynamic Learning):**\n\n');
+      for (var entry in sorted) {
+        final pct = totalExpense > 0 ? (entry.value / totalExpense * 100).toStringAsFixed(1) : '0';
+        buffer.write('• **${entry.key}:** จ่ายรวม **${CurrencyFormatter.format(entry.value)}** ($pct%)\n');
+        
+        final topCatOfPartner = partnerCatBreakdown[entry.key]?.entries.toList();
+        if (topCatOfPartner != null && topCatOfPartner.isNotEmpty) {
+          topCatOfPartner.sort((a, b) => b.value.compareTo(a.value));
+          buffer.write('   *👉 ส่วนใหญ่หมดไปกับ: ${topCatOfPartner.first.key} (${CurrencyFormatter.format(topCatOfPartner.first.value)})*\n');
+        }
+      }
+      return buffer.toString();
+    }
+
+    // 4. Query: Total expenses / Summary
     if (cleanQuery.contains('เท่าไหร่') || cleanQuery.contains('สรุป') || cleanQuery.contains('เดือนนี้')) {
       if (expenses.isEmpty) {
         return '💕 ในเดือนนี้คู่ของคุณยังไม่มีบันทึกรายจ่ายเข้ามาเลยครับ เริ่มต้นจดบันทึกเพื่อติดตามงบด้วยกันได้เลย!';
@@ -81,30 +230,7 @@ class AIFinanceService {
           '${netBalance >= 0 ? "เก่งมากครับ! เดือนนี้คุมงบได้ดีเยี่ยม มีเงินเหลือออมด้วยนะ 💕" : "เดือนนี้รายจ่ายค่อนข้างสูง ลองช่วยกันคุมงบมื้อเย็นเพิ่มเติมดูนะครับ ✌️"}';
     }
 
-    // 3. Query: Who spent more (Partner Comparison)
-    if (cleanQuery.contains('ใคร') || cleanQuery.contains('เทียบ') || cleanQuery.contains('จ่ายเยอะ') || cleanQuery.contains('จ่าย')) {
-      final Map<String, double> partnerExpense = {};
-      for (var t in expenses) {
-        final name = (t.createdByName != null && t.createdByName!.isNotEmpty)
-            ? t.createdByName!
-            : 'สมาชิกคู่รัก';
-        partnerExpense[name] = (partnerExpense[name] ?? 0) + t.amount;
-      }
-
-      if (partnerExpense.isEmpty) {
-        return 'ยังไม่มีข้อมูลการจ่ายเงินของเดือนนี้ครับ';
-      }
-
-      final sorted = partnerExpense.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-      final buffer = StringBuffer('👩‍❤️‍👨 **สถิติเปรียบเทียบการจ่ายเงินของคู่เรา:**\n\n');
-      for (var entry in sorted) {
-        final pct = totalExpense > 0 ? (entry.value / totalExpense * 100).toStringAsFixed(1) : '0';
-        buffer.write('• **${entry.key}:** ${CurrencyFormatter.format(entry.value)} ($pct%)\n');
-      }
-      return buffer.toString();
-    }
-
-    // 4. Query: Predictions
+    // 5. Query: Predictions
     if (cleanQuery.contains('ทำนาย') || cleanQuery.contains('ล่วงหน้า') || cleanQuery.contains('อนาคต')) {
       final predictions = predictUpcomingExpenses(transactions);
       final buffer = StringBuffer('🔮 **ผลวิเคราะห์ทำนายบิลล่วงหน้าของ AI:**\n\n');
@@ -114,27 +240,14 @@ class AIFinanceService {
       return buffer.toString();
     }
 
-    // 3. Query: Food / Utility bills
-    if (cleanQuery.contains('อาหาร') || cleanQuery.contains('กิน') || cleanQuery.contains('ไฟ') || cleanQuery.contains('น้ำ')) {
-      final foodTxs = expenses.where((t) {
-        final catName = catMap[t.mainCategoryId] ?? '';
-        final note = (t.note ?? '').toLowerCase();
-        return catName.contains('อาหาร') || catName.contains('กิน') || note.contains('ข้าว') || note.contains('ไฟ') || note.contains('น้ำ');
-      }).toList();
-
-      final foodTotal = foodTxs.fold(0.0, (sum, t) => sum + t.amount);
-      return '🍚 **สรุปค่าหมวดหมู่ประจำเดือน:**\n'
-          'ในเดือนนี้มียอดในหมวดหมู่นี้รวม **${CurrencyFormatter.format(foodTotal)}** (${foodTxs.length} รายการ)\n\n'
-          '💡 AI แนะนำ: คุณสามารถวางแผนมื้ออาหารทำกินเองที่บ้านคู่กันเพื่อประหยัดงบได้เพิ่มอีก 15-20% เลยนะ!';
-    }
-
     // Default friendly response
-    return '🤖 **สวัสดีครับ! ผมคือ AI ที่ปรึกษาการเงินคู่รักของคุณ**\n\n'
+    return '🤖 **สวัสดีครับ! ผมคือ AI ที่ปรึกษาการเงินคู่รัก Kapookluxx** 💕\n\n'
         'เดือนนี้คู่ของคุณใช้จ่ายรวม **${CurrencyFormatter.format(totalExpense)}** '
         'คุณสามารถถามผมเพิ่มเติมได้ เช่น:\n'
-        '• *"เดือนนี้เราใช้เงินไปเท่าไหร่?"*\n'
+        '• *"หมวดย่อยใช้อะไรเยอะสุด?"*\n'
+        '• *"เช็กสถานะงบประมาณหมวดย่อย"*\n'
         '• *"ใครจ่ายเงินมากกว่ากันในเดือนนี้?"*\n'
-        '• *"ทำนายบิลล่วงหน้า"*';
+        '• *"สรุปรายรับรายจ่ายเดือนนี้"*';
   }
 
   /// AI Expense Predictor Engine
