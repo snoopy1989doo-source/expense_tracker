@@ -45,7 +45,7 @@ class AIFinanceService {
     }
     try {
       final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$cleanKey',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$cleanKey',
       );
       final response = await http
           .post(
@@ -198,7 +198,7 @@ class AIFinanceService {
 $query
 ''';
 
-    final models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+    final models = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-flash-latest'];
 
     for (final model in models) {
       try {
