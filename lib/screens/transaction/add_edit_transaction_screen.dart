@@ -193,14 +193,14 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       matchedAmount = double.tryParse(str ?? '');
     }
 
-    // Tier 2: Direct Keyword + Amount (Thai & English + OCR character variants)
+    // Tier 2: Keyword-adjacent amount e.g. "จำนวน\n130.00 บาท", "ยอดเงิน 130.00", "Amount 130.00 THB"
     if (matchedAmount == null) {
-      final tier2Regexes = [
-        RegExp(r'(?:จำนวน(?:เงิน)?|ยอดเงิน|ยอดโอน|ยอดรวม|โอนเงิน|จ่ายเงิน|ชำระเงิน|amount|total|paid|transfer|sum|net|payment|subtotal|grand\s*total)\s*:?\s*(\d{1,6}(?:,\d{3})*(?:\.\d{1,2})?)', caseSensitive: false),
+      final keywordRegexes = [
+        RegExp(r'(?:จำนวน(?:เงิน)?|ยอดเงิน|ยอดโอน|ยอดรวม|โอนเงิน|จ่ายเงิน|ชำระเงิน|amount|total|paid|transfer|sum|net|payment|subtotal|grand\s*total)[\s\S]{0,35}?(\d{1,6}(?:,\d{3})*\.\d{2})', caseSensitive: false),
         RegExp(r'(\d{1,6}(?:,\d{3})*\.\d{2})\s*(?:บาท|thb|baht|฿|usd|un|vn|bade|ble)', caseSensitive: false),
       ];
 
-      for (var regex in tier2Regexes) {
+      for (var regex in keywordRegexes) {
         final matches = regex.allMatches(extractedText);
         for (var m in matches) {
           final str = m.group(1)?.replaceAll(',', '');
@@ -216,21 +216,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       }
     }
 
-    // Tier 3: Multiline Keyword Search across linebreaks e.g. "จำนวน\n130.00" or "Total\n130.00"
-    if (matchedAmount == null) {
-      final multilineMatch = RegExp(r'(?:จำนวน(?:เงิน)?|ยอดเงิน|ยอดโอน|amount|total|paid|sum)[\s\S]{1,35}?(\d{1,6}(?:,\d{3})*\.\d{2})', caseSensitive: false).firstMatch(extractedText);
-      if (multilineMatch != null) {
-        final str = multilineMatch.group(1)?.replaceAll(',', '');
-        if (str != null) {
-          final val = double.tryParse(str);
-          if (val != null && val > 0 && val < 500000) {
-            matchedAmount = val;
-          }
-        }
-      }
-    }
-
-    // Tier 4: Fallback to first valid 2-decimal number (ignoring years e.g. 2569, 2026)
+    // Tier 3: First positive 2-decimal number on the slip (ignoring 0.00 fee)
     if (matchedAmount == null) {
       final allDecimals = RegExp(r'(\d{1,6}(?:,\d{3})*\.\d{2})').allMatches(extractedText);
       for (var m in allDecimals) {
@@ -238,8 +224,6 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
         if (str != null) {
           final val = double.tryParse(str);
           if (val != null && val > 0 && val < 500000) {
-            // Exclude years e.g. 2020..2580 if no decimal point in raw text
-            if (val >= 2020 && val <= 2580 && !str.contains('.')) continue;
             matchedAmount = val;
             break;
           }

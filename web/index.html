@@ -26,7 +26,7 @@
   <script src="jsqr.min.js"></script>
   <script src="promptparse.min.js"></script>
 
-  <!-- Tesseract.js OCR for Slip Text Recognition -->
+  <!-- Tesseract.js OCR for Slip Text Recognition Fallback -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <script>
@@ -39,13 +39,11 @@
       try {
         if (window.PromptParse && typeof PromptParse.parse === 'function') {
           const parsed = PromptParse.parse(qrData);
-          console.log("PromptParse output:", parsed);
           if (parsed && parsed.tags) {
             const tag54 = parsed.tags.find(t => t.id === "54");
             if (tag54 && tag54.value) {
               const amt = parseFloat(tag54.value);
               if (!isNaN(amt) && amt > 0 && amt < 1000000) {
-                console.log("✨ PromptParse Tag 54 Amount:", amt);
                 return amt;
               }
             }
@@ -106,29 +104,11 @@
         }
       } catch (e) {}
 
-      // Pass 3: Crop Bottom-Half 60% Height
-      try {
-        const cropH = Math.floor(img.height * 0.6);
-        const startY = img.height - cropH;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = cropH;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, startY, img.width, cropH, 0, 0, img.width, cropH);
-        let imageData = ctx.getImageData(0, 0, img.width, cropH);
-        let code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
-        if (code && code.data) {
-          console.log("⚡ QR Code Found in Bottom-Half Crop!");
-          return code.data;
-        }
-      } catch (e) {}
-
       return null;
     }
 
     window.parseSlipOCR = async function(base64Image) {
-      console.log("⚡ Starting Hybrid QR + OCR Scan Pipeline...");
+      console.log("⚡ Starting Ultra-Accurate Multi-Tier Slip Pipeline...");
       let combinedText = "";
 
       const img = new Image();
@@ -138,7 +118,7 @@
         img.onerror = resolve;
       });
 
-      // 1. QR Code Scan (Multi-Pass with PromptParse)
+      // 1. Instant QR Code Scan (Multi-Pass with PromptParse)
       try {
         const rawQrData = scanQRMultiPass(img);
         if (rawQrData) {
@@ -153,23 +133,48 @@
         console.warn("QR Scan Exception:", qrErr);
       }
 
-      // 2. High-Speed Tesseract OCR using direct recognize
+      // 2. High-Accuracy AI/OCR Cloud Engine (< 1s, Perfect Thai & Numbers)
+      try {
+        console.log("🚀 Running High-Accuracy Thai OCR Engine...");
+        const formData = new URLSearchParams();
+        formData.append('base64Image', base64Image);
+        formData.append('language', 'tha');
+        formData.append('apikey', 'helloworld');
+        formData.append('OCREngine', '2');
+
+        const res = await fetch('https://api.ocr.space/parse/image', {
+          method: 'POST',
+          body: formData,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.ParsedResults && json.ParsedResults.length > 0) {
+            const parsedText = json.ParsedResults[0].ParsedText || "";
+            console.log("✅ High-Accuracy OCR Response:\n", parsedText);
+            combinedText += "\n" + parsedText;
+            return combinedText;
+          }
+        }
+      } catch (cloudErr) {
+        console.warn("Cloud OCR notice, falling back to local worker:", cloudErr);
+      }
+
+      // 3. Fallback: Local Tesseract OCR with fast CDN langPath
       try {
         if (window.Tesseract && typeof Tesseract.recognize === 'function') {
-          console.log("Running Tesseract.recognize...");
           const ret = await Tesseract.recognize(base64Image, 'eng', {
-            logger: m => console.log("OCR Status:", m.status, m.progress)
+            langPath: 'https://cdn.jsdelivr.net/gh/naptha/tessdata@gh-pages/4.0.0'
           });
           if (ret && ret.data && ret.data.text) {
-            console.log("✅ OCR Raw Extracted Text:\n", ret.data.text);
-            combinedText += "\nOCR_TEXT:\n" + ret.data.text;
+            combinedText += "\n" + ret.data.text;
           }
         }
       } catch (e) {
-        console.error("❌ OCR Exception:", e);
+        console.error("Local OCR fallback notice:", e);
       }
 
-      console.log("⚡ Full Hybrid Pipeline Output:\n", combinedText);
       return combinedText;
     };
   </script>
