@@ -187,7 +187,8 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     double? matchedAmount;
 
     // Smart extraction for amounts e.g. 130.00 while ignoring years e.g. 2569, 2026
-    final amountMatches = RegExp(r'(\d{1,6}(?:,\d{3})*(?:\.\d{1,2})?)').allMatches(extractedText);
+    final textToScan = '$extractedText $fileName';
+    final amountMatches = RegExp(r'(\d{1,6}(?:,\d{3})*(?:\.\d{1,2})?)').allMatches(textToScan);
     double? foundAmount;
 
     for (var m in amountMatches) {
@@ -250,13 +251,13 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       });
 
       final successMsg = matchedAmount != null
-          ? '✨ AI อ่านสลิปสำเร็จ! พบยอดเงิน ฿${matchedAmount.toStringAsFixed(2)} (${matchedNote ?? "เลือกหมวดหมู่อัตโนมัติ"})'
-          : '✨ AI สแกนสลิปสำเร็จ! เติมหมวดหมู่ให้อัตโนมัติ';
+          ? '✨ AI สแกนอ่านสลิปสำเร็จ! เติมยอดเงิน ฿${matchedAmount.toStringAsFixed(2)} ให้อัตโนมัติแล้ว'
+          : '📸 แนบรูปสลิปเรียบร้อยแล้ว กรุณากรอกจำนวนเงิน หรือกดปุ่ม 🧮 เพื่อคิดเลขได้เลยครับ';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(successMsg),
-          backgroundColor: Colors.green.shade700,
+          backgroundColor: matchedAmount != null ? Colors.green.shade700 : AppColors.primary,
           duration: const Duration(seconds: 4),
         ),
       );
