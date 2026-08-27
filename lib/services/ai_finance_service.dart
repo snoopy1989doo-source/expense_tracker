@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/transaction_item.dart';
 import '../models/main_category.dart';
 import '../models/sub_category.dart';
@@ -20,6 +24,163 @@ class AIPredictionResult {
 }
 
 class AIFinanceService {
+  /// Asynchronous AI Finance Engine with Google Gemini LLM + Graceful Local Fallback
+  static Future<String> answerUserQueryAsync({
+    required String query,
+    required List<TransactionItem> transactions,
+    required List<MainCategory> categories,
+    required List<SubCategory> subCategories,
+    required Map<String, double> subcategoryBudgets,
+    required String? currentUserName,
+    String? partnerName,
+  }) async {
+    // 1. Try Google Gemini API if configured
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final apiKey = prefs.getString('gemini_api_key') ?? '';
+
+      if (apiKey.trim().isNotEmpty) {
+        final geminiReply = await _callGeminiApi(
+          apiKey: apiKey.trim(),
+          query: query,
+          transactions: transactions,
+          categories: categories,
+          subCategories: subCategories,
+          subcategoryBudgets: subcategoryBudgets,
+          currentUserName: currentUserName,
+          partnerName: partnerName,
+        );
+
+        if (geminiReply != null && geminiReply.trim().isNotEmpty) {
+          return geminiReply.trim();
+        }
+      }
+    } catch (e) {
+      debugPrint('🛡️ [Gemini Safe Fallback] Handled error seamlessly: $e');
+    }
+
+    // 2. Safe Fallback: Local Smart Engine (Always works 100%, 0 crash guarantee)
+    return answerUserQuery(
+      query: query,
+      transactions: transactions,
+      categories: categories,
+      subCategories: subCategories,
+      subcategoryBudgets: subcategoryBudgets,
+      currentUserName: currentUserName,
+      partnerName: partnerName,
+    );
+  }
+
+  /// Direct REST Call to Google Gemini API (Ultra-fast gemini-1.5-flash with timeout)
+  static Future<String?> _callGeminiApi({
+    required String apiKey,
+    required String query,
+    required List<TransactionItem> transactions,
+    required List<MainCategory> categories,
+    required List<SubCategory> subCategories,
+    required Map<String, double> subcategoryBudgets,
+    required String? currentUserName,
+    String? partnerName,
+  }) async {
+    final now = DateTime.now();
+    final currentMonthTxs = transactions.where((t) {
+      return t.date.year == now.year && t.date.month == now.month;
+    }).toList();
+
+    final expenses = currentMonthTxs.where((t) => t.type == 'expense').toList();
+    final income = currentMonthTxs.where((t) => t.type == 'income').toList();
+    final totalExpense = expenses.fold(0.0, (sum, t) => sum + t.amount);
+    final totalIncome = income.fold(0.0, (sum, t) => sum + t.amount);
+    final netBalance = totalIncome - totalExpense;
+
+    final daysTogether = now.difference(DateTime(2023, 1, 17)).inDays;
+
+    final mainCatMap = {for (var c in categories) c.id: c};
+    final subCatMap = {for (var s in subCategories) s.id: s};
+
+    // Build spending summary by subcategory
+    final Map<String, double> subExpense = {};
+    for (var t in expenses) {
+      final name = subCatMap[t.subCategoryId]?.name ?? t.note ?? mainCatMap[t.mainCategoryId]?.name ?? 'ทั่วไป';
+      subExpense[name] = (subExpense[name] ?? 0) + t.amount;
+    }
+    final topSubList = subExpense.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final topSubSummary = topSubList.take(5).map((e) => '${e.key}: ${CurrencyFormatter.format(e.value)}').join(', ');
+
+    // System prompt with full family & financial context
+    final systemPrompt = '''
+คุณคือ "AI ที่ปรึกษาการเงินและผู้ช่วยชีวิตคู่" ประจำแอป Kapookluxx
+ข้อมูลบริบทของผู้ใช้และครอบครัว (Real Context):
+- ผู้ใช้: พี่ต๋อง (อายุ 23 ปี, ทำงานเป็นช่างไฟฟ้าระบบ Utility ในโรงงาน ฐานเงินเดือน ~12,000-15,000 บาท)
+- แฟนสาว: น้องฝน (อายุ 23 ปี, เกิด 15 มกราคม 2546)
+- วันครบรอบเป็นแฟนกัน: 17 มกราคม 2566 (คบกันมาแล้ว $daysTogether วัน)
+- วันเกิดพี่ต๋อง: 17 มกราคม 2546 (วันเดียวกับวันครบรอบ)
+- สมาชิกสี่ขาประจำบ้าน: น้องแมว 2 ตัว ชื่อ "กังฟู" 🥋 (สุดซน) และ "โอเลี้ยง" ☕ (แมวดำขี้อ้อน)
+- เป้าหมายใหญ่ของชีวิตคู่:
+  1. ปลดหนี้คุณแม่ 50,000 บาท (Priority 1 เพื่อความสุขและความภาคภูมิใจของครอบครัว)
+  2. เก็บเงินดาวน์รถยนต์ BMW มือสอง (เป้าหมาย 260,000 บาท) เพื่อพาแม่และฝนเที่ยวอย่างมีความสุข
+  3. โปรเจกต์ "ร้านของชำบ้านดวด" (ต.สวนแตง อ.ละแม จ.ชุมพร) และเปิดมุมน้ำชงเครื่องดื่มให้ฝนมาขาย
+  4. กองทุนสร้างครอบครัวและแต่งงานในอนาคต
+
+สรุปข้อมูลการเงินจริงเดือนนี้:
+- รายรับรวม: ${CurrencyFormatter.format(totalIncome)}
+- รายจ่ายรวม: ${CurrencyFormatter.format(totalExpense)}
+- คงเหลือสุทธิ: ${CurrencyFormatter.format(netBalance)}
+- รายการใช้จ่ายเด่น: $topSubSummary
+
+แนวทางการตอบ:
+- ตอบเป็นภาษาไทยอย่างอบอุ่น เป็นกันเอง สุภาพ น่ารัก สไตล์ที่ปรึกษาการเงินคู่รักตัวจริง (เรียกผู้ใช้ว่า "พี่ต๋อง" และแฟนว่า "น้องฝน")
+- ให้คำแนะนำทางการเงินที่สมเหตุสมผล ให้กำลังใจ และเน้นความสุขของชีวิตคู่
+- ใช้ Emoji ประกอบน่ารักๆ จัดรูปแบบ Markdown ให้อ่านง่าย
+- กระชับ ตรงประเด็น หากเป็นการปรึกษาทั่วไปให้ตอบอย่างสร้างสรรค์และมีเหตุผล
+''';
+
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey',
+    );
+
+    final requestBody = jsonEncode({
+      'contents': [
+        {
+          'role': 'user',
+          'parts': [
+            {'text': query}
+          ]
+        }
+      ],
+      'systemInstruction': {
+        'parts': [
+          {'text': systemPrompt}
+        ]
+      },
+      'generationConfig': {
+        'temperature': 0.7,
+        'maxOutputTokens': 800,
+      }
+    });
+
+    final response = await http
+        .post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: requestBody,
+        )
+        .timeout(const Duration(seconds: 8));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      final candidates = data['candidates'] as List?;
+      if (candidates != null && candidates.isNotEmpty) {
+        final content = candidates[0]['content'];
+        final parts = content['parts'] as List?;
+        if (parts != null && parts.isNotEmpty) {
+          return parts[0]['text'] as String?;
+        }
+      }
+    }
+    return null;
+  }
+
   /// AI Finance Assistant Chat Engine (Deep Subcategories + Dynamic Learning)
   static String answerUserQuery({
     required String query,

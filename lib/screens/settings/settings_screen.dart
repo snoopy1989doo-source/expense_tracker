@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
@@ -243,6 +243,77 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         onConfirm: () {
           authNotifier.signOut();
         },
+      );
+    }
+
+    void showGeminiApiKeyDialog() {
+      final keyController = TextEditingController();
+
+      SharedPreferences.getInstance().then((prefs) {
+        keyController.text = prefs.getString('gemini_api_key') ?? '';
+      });
+
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.auto_awesome, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text('Google Gemini API Key 🤖', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'ใส่ Google Gemini API Key เพื่อปลดล็อกให้ AI สามารถตอบคำถามปลายเปิด, ปรึกษาวางแผนการเงินลึกๆ และคุยเล่นได้ทุกเรื่อง:',
+                style: TextStyle(fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: keyController,
+                decoration: const InputDecoration(
+                  labelText: 'Gemini API Key (AIzaSy...)',
+                  hintText: 'วาง API Key ของคุณที่นี่',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                '💡 รับ API Key ได้ฟรีที่ aistudio.google.com/app/apikey (มีโหมดฟรี 100%)\n*หากไม่ใส่ ระบบจะใช้ Smart Local Engine ในเครื่องให้อัตโนมัติ ปลอดภัยและแอปไม่พังแน่นอนครับ!*',
+                style: TextStyle(fontSize: 10, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('gemini_api_key');
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+              child: const Text('ล้างค่า API Key', style: TextStyle(color: Colors.red, fontSize: 12)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final key = keyController.text.trim();
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('gemini_api_key', key);
+                if (ctx.mounted) {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(key.isNotEmpty ? '✨ บันทึก Gemini API Key เรียบร้อยแล้ว' : 'สลับเป็นโหมด Local Engine')),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              child: const Text('บันทึก'),
+            ),
+          ],
+        ),
       );
     }
 
@@ -578,6 +649,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 MaterialPageRoute(builder: (context) => const WalletManagementScreen()),
               );
             },
+          ),
+          ListTile(
+            leading: const Icon(Icons.auto_awesome, color: AppColors.primary),
+            title: const Text('ตั้งค่า Google Gemini API Key 🤖', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: const Text('ใส่ API Key เพื่อเปิดใช้งาน AI ตอบคำถามปลายเปิดและวางแผนการเงินแบบไม่จำกัด'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: showGeminiApiKeyDialog,
           ),
           const Divider(),
 
