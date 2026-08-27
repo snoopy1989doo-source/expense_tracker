@@ -22,38 +22,45 @@
   <title>Kapookluxx — แอปรายรับ-รายจ่ายสำหรับคู่รัก</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- Tiny 40KB Instant jsQR Scanner for Thai Bank Slip QR payloads -->
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <!-- Local Offline Bundled Libraries for 100% Reliability & Zero-Latency -->
+  <script src="jsqr.min.js"></script>
+  <script src="promptparse.min.js"></script>
 
-  <!-- Tesseract.js OCR for Thai/Eng Bank Slip Text Recognition Fallback -->
+  <!-- Tesseract.js OCR for Slip Text Recognition -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <script>
     // PromptParse & ITMX BOT EMVCo Thai Bank Slip Verification Payload Decoder
     function decodeThaiSlipQR(qrData) {
       if (!qrData) return null;
-      console.log("🔍 Decoding Raw Slip QR Data:", qrData);
+      console.log("🔍 Decoding Raw Slip QR Data with PromptParse:", qrData);
 
-      // 1. Standard EMVCo / PromptPay Tag 54 Amount (e.g. ...5406130.00...)
+      // 1. Local PromptParse Library Decoding
+      try {
+        if (window.PromptParse && typeof PromptParse.parse === 'function') {
+          const parsed = PromptParse.parse(qrData);
+          console.log("PromptParse output:", parsed);
+          if (parsed && parsed.tags) {
+            const tag54 = parsed.tags.find(t => t.id === "54");
+            if (tag54 && tag54.value) {
+              const amt = parseFloat(tag54.value);
+              if (!isNaN(amt) && amt > 0 && amt < 1000000) {
+                console.log("✨ PromptParse Tag 54 Amount:", amt);
+                return amt;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("PromptParse decode error:", err);
+      }
+
+      // 2. Direct regex match on standard EMVCo Tag 54
       const tag54Match = qrData.match(/54(\d{2})(\d+\.?\d*)/);
       if (tag54Match) {
         const len = parseInt(tag54Match[1], 10);
         if (!isNaN(len) && len > 0 && len <= 12) {
-          const amtStr = tag54Match[2].substring(0, len);
-          const amt = parseFloat(amtStr);
-          if (!isNaN(amt) && amt > 0 && amt < 1000000) {
-            return amt;
-          }
-        }
-      }
-
-      // 2. ITMX BOT Slip Verification Payload (Tag 000400000140 / Sub-tag 05 Amount)
-      const itmxMatch = qrData.match(/(?:05|54)(\d{2})(\d+\.?\d*)/);
-      if (itmxMatch) {
-        const len = parseInt(itmxMatch[1], 10);
-        if (!isNaN(len) && len > 0 && len <= 12) {
-          const amtStr = itmxMatch[2].substring(0, len);
-          const amt = parseFloat(amtStr);
+          const amt = parseFloat(tag54Match[2].substring(0, len));
           if (!isNaN(amt) && amt > 0 && amt < 1000000) {
             return amt;
           }
@@ -131,7 +138,7 @@
         img.onerror = resolve;
       });
 
-      // 1. QR Code Scan (Multi-Pass)
+      // 1. QR Code Scan (Multi-Pass with PromptParse)
       try {
         const rawQrData = scanQRMultiPass(img);
         if (rawQrData) {
@@ -146,14 +153,17 @@
         console.warn("QR Scan Exception:", qrErr);
       }
 
-      // 2. High-Speed Tesseract OCR
+      // 2. High-Speed Tesseract OCR using direct recognize
       try {
-        if (window.Tesseract) {
-          const worker = await Tesseract.createWorker('eng');
-          const ret = await worker.recognize(base64Image);
-          await worker.terminate();
-          console.log("✅ OCR Raw Extracted Text:\n", ret.data.text);
-          combinedText += "\nOCR_TEXT:\n" + (ret.data.text || "");
+        if (window.Tesseract && typeof Tesseract.recognize === 'function') {
+          console.log("Running Tesseract.recognize...");
+          const ret = await Tesseract.recognize(base64Image, 'eng', {
+            logger: m => console.log("OCR Status:", m.status, m.progress)
+          });
+          if (ret && ret.data && ret.data.text) {
+            console.log("✅ OCR Raw Extracted Text:\n", ret.data.text);
+            combinedText += "\nOCR_TEXT:\n" + ret.data.text;
+          }
         }
       } catch (e) {
         console.error("❌ OCR Exception:", e);
