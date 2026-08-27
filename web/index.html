@@ -29,10 +29,25 @@
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <script>
+    // Strict EMVCo TLV Parser (Tag-Length-Value) to prevent picking fake "54" inside Ref IDs
+    function parseEMVCoTags(qrData) {
+      let idx = 0;
+      const tags = {};
+      while (idx < qrData.length - 4) {
+        const tag = qrData.substring(idx, idx + 2);
+        const len = parseInt(qrData.substring(idx + 2, idx + 4), 10);
+        if (isNaN(len) || len < 0 || idx + 4 + len > qrData.length) break;
+        const val = qrData.substring(idx + 4, idx + 4 + len);
+        tags[tag] = val;
+        idx += 4 + len;
+      }
+      return tags;
+    }
+
     window.parseSlipOCR = async function(base64Image) {
       console.log("⚡ Starting Instant Slip Scan...");
 
-      // 1. Ultra-fast QR Code Payload Decoding (0.01s Instant Detection)
+      // 1. Ultra-fast QR Code TLV Decoding (0.01s Instant Detection)
       try {
         const img = new Image();
         img.src = base64Image;
@@ -52,26 +67,25 @@
           const code = jsQR(imageData.data, imageData.width, imageData.height);
           if (code && code.data) {
             console.log("🎉 Instant QR Code Scanned:", code.data);
-            // EMVCo / Thai Bank Slip standard Tag 54 is Amount
-            // Tag 54 format: ...5406130.00... or ...540550.00...
-            const tag54Index = code.data.indexOf("54");
-            if (tag54Index !== -1) {
-              const lenStr = code.data.substring(tag54Index + 2, tag54Index + 4);
-              const len = parseInt(lenStr, 10);
-              if (!isNaN(len) && len > 0 && len <= 12) {
-                const amtStr = code.data.substring(tag54Index + 4, tag54Index + 4 + len);
-                console.log("✨ Extracted Amount from Slip QR Tag 54:", amtStr);
-                return "จำนวนเงิน " + amtStr + " บาท\n" + code.data;
+
+            // Parse EMVCo tags strictly
+            if (code.data.startsWith("0002")) {
+              const tags = parseEMVCoTags(code.data);
+              if (tags["54"]) {
+                const amt = parseFloat(tags["54"]);
+                if (!isNaN(amt) && amt > 0 && amt < 1000000) {
+                  console.log("✨ Strict EMVCo Tag 54 Amount Extracted:", amt);
+                  return "จำนวนเงิน " + amt.toFixed(2) + " บาท\n" + code.data;
+                }
               }
             }
-            return code.data;
           }
         }
       } catch (qrErr) {
         console.warn("QR Scan Exception:", qrErr);
       }
 
-      // 2. Tesseract OCR Fallback (if no QR code on slip)
+      // 2. Tesseract OCR Fallback (if no QR code or non-EMVCo QR)
       try {
         if (window.Tesseract) {
           const worker = await Tesseract.createWorker('eng');

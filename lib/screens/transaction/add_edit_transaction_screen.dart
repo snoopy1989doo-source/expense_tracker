@@ -186,30 +186,34 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     String? matchedNote;
     double? matchedAmount;
 
-    // Smart extraction for amounts e.g. 130.00 while ignoring years e.g. 2569, 2026
-    final textToScan = '$extractedText $fileName';
-    final amountMatches = RegExp(r'(\d{1,6}(?:,\d{3})*(?:\.\d{1,2})?)').allMatches(textToScan);
-    double? foundAmount;
-
-    for (var m in amountMatches) {
-      final str = m.group(1)?.replaceAll(',', '');
-      if (str == null) continue;
-      final val = double.tryParse(str);
-      if (val == null || val <= 0) continue;
-
-      // Filter out years e.g. 2569, 2568, 2026, 2025
-      if (val >= 2020 && val <= 2580 && !str.contains('.')) continue;
-
-      // If number has decimal places (e.g. 130.00, 50.00), prioritize it!
-      if (str.contains('.')) {
-        foundAmount = val;
-        break;
-      } else if (foundAmount == null) {
-        foundAmount = val;
-      }
+    // Priority 1: Direct match from QR Tag 54 payload e.g. "จำนวนเงิน 130.00 บาท"
+    final qrAmountMatch = RegExp(r'จำนวนเงิน\s+(\d{1,6}(?:,\d{3})*\.\d{2})\s+บาท', caseSensitive: false).firstMatch(extractedText);
+    if (qrAmountMatch != null) {
+      final str = qrAmountMatch.group(1)?.replaceAll(',', '');
+      matchedAmount = double.tryParse(str ?? '');
     }
 
-    matchedAmount = foundAmount;
+    // Priority 2: Keyword-adjacent amount e.g. "จำนวน 130.00", "ยอดเงิน 130.00", "130.00 บาท"
+    if (matchedAmount == null) {
+      final keywordRegexes = [
+        RegExp(r'(?:จำนวน(?:เงิน)?|ยอดเงิน|baht|thb|฿|amount)[\s\S]*?(\d{1,6}(?:,\d{3})*\.\d{2})', caseSensitive: false),
+        RegExp(r'(\d{1,6}(?:,\d{3})*\.\d{2})\s*(?:บาท|thb|baht|฿)', caseSensitive: false),
+      ];
+
+      for (var regex in keywordRegexes) {
+        final m = regex.firstMatch(extractedText);
+        if (m != null) {
+          final str = m.group(1)?.replaceAll(',', '');
+          if (str != null) {
+            final val = double.tryParse(str);
+            if (val != null && val > 0 && val < 500000) {
+              matchedAmount = val;
+              break;
+            }
+          }
+        }
+      }
+    }
 
     if (fullTextToScan.contains('pea') || fullTextToScan.contains('ไฟฟ้า') || fullTextToScan.contains('ภูมิภาค')) {
       matchedNote = 'ค่าไฟฟ้าส่วนภูมิภาค';
