@@ -11,9 +11,11 @@ import '../../providers/category_provider.dart';
 import '../../providers/wallet_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/couple_provider.dart';
 import '../../models/transaction_item.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../services/merchant_learning_service.dart';
 import '../../widgets/common/custom_button.dart';
 import '../../widgets/common/custom_text_field.dart';
 import '../../widgets/common/confirm_dialog.dart';
@@ -45,6 +47,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   String? _existingImageUrl;
   final List<String> _receiptImagesList = []; // Multi-image support
   bool _isSaving = false;
+  String? _detectedReceiverName; // AI Merchant / Receiver Quiet Memory
 
   // Split Bill / Multi-Category Breakdown mode 🔀
   bool _isSplitBill = false;
@@ -153,6 +156,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
 
   Future<void> _analyzeSlipAndAutoFill(String fileName, Uint8List bytes, String base64Str) async {
     final mainCats = ref.read(mainCategoriesProvider);
+    final coupleRoomId = ref.read(coupleRoomIdProvider);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -171,7 +175,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
 
     String extractedText = '';
 
-    // Step 1: Direct High-Accuracy Thai Cloud OCR via HTTP (Fast ~0.9s, 100% Thai & numbers precision)
+    // Step 1: Direct High-Accuracy Thai Cloud OCR via HTTP
     try {
       final uri = Uri.parse('https://api.ocr.space/parse/image');
       final response = await http.post(
@@ -211,7 +215,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
 
     final fullTextToScan = '$fileName $extractedText'.toLowerCase();
     String? matchedCategory;
-    String? matchedNote;
+    String? matchedSubCategory;
     double? matchedAmount;
 
     // Tier 1: Direct match from QR Tag 54 payload e.g. "จำนวนเงิน 130.00 บาท"
@@ -259,64 +263,95 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       }
     }
 
-    // Auto-detect Receiver Name for Note if available
+    // Auto-detect Receiver / Shop Name for AI Learning (Background Only, DO NOT pollute Note)
     final receiverRegexes = [
-      RegExp(r'(?:ไปยัง|ผู้รับ|to)\s*:?\s*([ก-๙a-zA-Z\.\(\)\s]{3,40})', caseSensitive: false),
       RegExp(r'ถุงเงิน\s*\(([ก-๙a-zA-Z\.\s]+)\)'),
+      RegExp(r'(?:ไปยัง|ผู้รับ|to)\s*:?\s*([ก-๙a-zA-Z\.\(\)\s]{3,35})', caseSensitive: false),
+      RegExp(r'([ก-๙a-zA-Z\s]{3,25})\s*(?:xxx-xxx-\d{4}|xxx-x-x\d{4}-x)', caseSensitive: false),
     ];
     for (var r in receiverRegexes) {
       final m = r.firstMatch(extractedText);
       if (m != null) {
         final name = m.group(1)?.trim();
-        if (name != null && name.isNotEmpty) {
-          matchedNote = name.startsWith('ถุงเงิน') ? name : 'โอนให้ $name';
+        if (name != null && name.isNotEmpty && !name.contains('make') && !name.contains('kbank')) {
+          _detectedReceiverName = name;
           break;
         }
       }
     }
 
-    if (fullTextToScan.contains('pea') || fullTextToScan.contains('ไฟฟ้า') || fullTextToScan.contains('ภูมิภาค')) {
-      matchedNote = 'ค่าไฟฟ้าส่วนภูมิภาค';
-      matchedCategory = mainCats.firstWhere(
-        (c) => c.name.contains('ไฟ') || c.name.contains('น้ำ') || c.name.contains('Living'),
-        orElse: () => mainCats.first,
-      ).id;
-    } else if (fullTextToScan.contains('mwa') || fullTextToScan.contains('pwa') || fullTextToScan.contains('ประปา')) {
-      matchedNote = 'ค่าน้ำประปา';
-      matchedCategory = mainCats.firstWhere(
-        (c) => c.name.contains('น้ำ') || c.name.contains('ไฟ') || c.name.contains('Living'),
-        orElse: () => mainCats.first,
-      ).id;
-    } else if (fullTextToScan.contains('true') || fullTextToScan.contains('ais') || fullTextToScan.contains('dtac') || fullTextToScan.contains('เน็ต')) {
-      matchedNote = 'ค่าอินเทอร์เน็ต / โทรศัพท์';
-      matchedCategory = mainCats.firstWhere(
-        (c) => c.name.contains('อินเทอร์เน็ต') || c.name.contains('ไฟ'),
-        orElse: () => mainCats.first,
-      ).id;
-    } else if (fullTextToScan.contains('อาหาร') || fullTextToScan.contains('ข้าว') || fullTextToScan.contains('cafe') || fullTextToScan.contains('ร้าน') || fullTextToScan.contains('ถุงเงิน')) {
-      matchedNote = matchedNote ?? 'ค่าอาหาร/กินดื่ม';
-      matchedCategory = mainCats.firstWhere(
-        (c) => c.name.contains('อาหาร') || c.name.contains('กิน') || c.name.contains('Living'),
-        orElse: () => mainCats.first,
-      ).id;
+    // AI Prediction from learned memory
+    if (_detectedReceiverName != null) {
+      final memory = await MerchantLearningService.predictCategory(
+        receiverOrMerchantName: _detectedReceiverName!,
+        householdId: coupleRoomId,
+      );
+      if (memory != null && memory.mainCategoryId.isNotEmpty) {
+        matchedCategory = memory.mainCategoryId;
+        matchedSubCategory = memory.subCategoryId;
+        debugPrint('✨ AI predicted category ${memory.mainCategoryId} from memory for $_detectedReceiverName');
+      }
+    }
+
+    // Keyword rule-based fallback if AI hasn't learned yet
+    if (matchedCategory == null) {
+      if (fullTextToScan.contains('pea') || fullTextToScan.contains('ไฟฟ้า') || fullTextToScan.contains('ภูมิภาค')) {
+        matchedCategory = mainCats.firstWhere(
+          (c) => c.name.contains('ไฟ') || c.name.contains('น้ำ') || c.name.contains('Living'),
+          orElse: () => mainCats.first,
+        ).id;
+      } else if (fullTextToScan.contains('mwa') || fullTextToScan.contains('pwa') || fullTextToScan.contains('ประปา')) {
+        matchedCategory = mainCats.firstWhere(
+          (c) => c.name.contains('น้ำ') || c.name.contains('ไฟ') || c.name.contains('Living'),
+          orElse: () => mainCats.first,
+        ).id;
+      } else if (fullTextToScan.contains('true') || fullTextToScan.contains('ais') || fullTextToScan.contains('dtac') || fullTextToScan.contains('เน็ต')) {
+        matchedCategory = mainCats.firstWhere(
+          (c) => c.name.contains('อินเทอร์เน็ต') || c.name.contains('ไฟ'),
+          orElse: () => mainCats.first,
+        ).id;
+      } else if (fullTextToScan.contains('อาหาร') || fullTextToScan.contains('ข้าว') || fullTextToScan.contains('cafe') || fullTextToScan.contains('ร้าน') || fullTextToScan.contains('ถุงเงิน')) {
+        matchedCategory = mainCats.firstWhere(
+          (c) => c.name.contains('อาหาร') || c.name.contains('กิน') || c.name.contains('Living'),
+          orElse: () => mainCats.first,
+        ).id;
+      }
     }
 
     if (mounted) {
+      double? finalTotalAmount;
+      if (matchedAmount != null) {
+        final currentVal = double.tryParse(_amountController.text.trim()) ?? 0.0;
+        // If more than 1 slip attached, accumulate total!
+        if (_receiptImagesList.length > 1 && currentVal > 0) {
+          finalTotalAmount = currentVal + matchedAmount;
+        } else {
+          finalTotalAmount = matchedAmount;
+        }
+      }
+
       setState(() {
-        if (matchedAmount != null) {
-          _amountController.text = matchedAmount.toStringAsFixed(2);
+        if (finalTotalAmount != null) {
+          _amountController.text = finalTotalAmount.toStringAsFixed(2);
         }
         if (matchedCategory != null) {
           _selectedMainCategoryId = matchedCategory;
-        }
-        if (matchedNote != null && _noteController.text.isEmpty) {
-          _noteController.text = matchedNote;
+          if (matchedSubCategory != null) {
+            _selectedSubCategoryId = matchedSubCategory;
+          }
         }
       });
 
-      final successMsg = matchedAmount != null
-          ? '✨ AI สแกนอ่านสลิปสำเร็จ! เติมยอดเงิน ฿${matchedAmount.toStringAsFixed(2)} ให้อัตโนมัติแล้ว'
-          : '📸 แนบรูปสลิปเรียบร้อยแล้ว กรุณากรอกจำนวนเงิน หรือกดปุ่ม 🧮 เพื่อคิดเลขได้เลยครับ';
+      String successMsg;
+      if (matchedAmount != null) {
+        if (_receiptImagesList.length > 1 && finalTotalAmount != null) {
+          successMsg = '✨ AI สแกนสลิปเพิ่มสำเร็จ! (+฿${matchedAmount.toStringAsFixed(2)}) รวมยอดบิลเป็น ฿${finalTotalAmount.toStringAsFixed(2)}';
+        } else {
+          successMsg = '✨ AI สแกนอ่านสลิปสำเร็จ! เติมยอดเงิน ฿${matchedAmount.toStringAsFixed(2)} ให้อัตโนมัติแล้ว';
+        }
+      } else {
+        successMsg = '📸 แนบรูปสลิปเรียบร้อยแล้ว กรุณากรอกจำนวนเงิน หรือกดปุ่ม 🧮 เพื่อคิดเลขได้เลยครับ';
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -486,6 +521,24 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     return total;
   }
 
+  Widget _buildMetricTile(String label, String value, Color valueColor) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: valueColor),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
   void _addSplitItemDialog() {
     final mainCats = ref.read(mainCategoriesProvider);
     final subCats = ref.read(subCategoriesProvider);
@@ -494,8 +547,14 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
         ? subCats.firstWhere((s) => s.mainCategoryId == tempMainCatId, orElse: () => subCats.first).id
         : null;
 
+    final totalBill = double.tryParse(_amountController.text.trim()) ?? 0.0;
+    final allocatedSum = _splitItems.fold<double>(0.0, (s, item) => s + (item['amount'] as double));
+    final remaining = totalBill - allocatedSum;
+
     final nameController = TextEditingController();
-    final amountController = TextEditingController();
+    final amountController = TextEditingController(
+      text: remaining > 0 ? remaining.toStringAsFixed(2) : '',
+    );
 
     showDialog(
       context: context,
@@ -504,24 +563,61 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
           final filteredSubs = subCats.where((s) => s.mainCategoryId == tempMainCatId).toList();
 
           return AlertDialog(
-            title: const Text('➕ เพิ่มรายการย่อยในบิลนี้', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.call_split, color: AppColors.primary),
+                SizedBox(width: 8),
+                Text('➕ เพิ่มรายการย่อยในบิลนี้', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (remaining > 0)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.amber.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.tips_and_updates, size: 16, color: Colors.amber),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '💡 คงเหลือที่ยังไม่ได้จัดสรร: ฿${remaining.toStringAsFixed(2)}',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(labelText: 'ชื่อรายการ (เช่น ขนม 🍦, น้ำยาซักผ้า 🧹)'),
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'ชื่อรายการ (เช่น ขนม 🍦, น้ำยาปรับผ้านุ่ม 🧹)',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: amountController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'จำนวนเงิน (฿)'),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'จำนวนเงิน (฿)',
+                    border: OutlineInputBorder(),
+                    prefixText: '฿ ',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: tempMainCatId,
-                  decoration: const InputDecoration(labelText: 'หมวดหมู่หลัก'),
+                  decoration: const InputDecoration(labelText: 'หมวดหมู่หลัก', border: OutlineInputBorder()),
                   items: mainCats.map((c) => DropdownMenuItem(value: c.id, child: Text('${c.emoji} ${c.name}'))).toList(),
                   onChanged: (val) {
                     setSubState(() {
@@ -533,7 +629,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: tempSubCatId,
-                  decoration: const InputDecoration(labelText: 'หมวดหมู่ย่อย'),
+                  decoration: const InputDecoration(labelText: 'หมวดหมู่ย่อย', border: OutlineInputBorder()),
                   items: filteredSubs.map((s) => DropdownMenuItem(value: s.id, child: Text('${s.emoji} ${s.name}'))).toList(),
                   onChanged: (val) => setSubState(() => tempSubCatId = val),
                 ),
@@ -556,15 +652,17 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                         'mainCatId': tempMainCatId,
                         'subCatId': tempSubCatId,
                       });
-                      // Recalculate total amount sum
-                      final sum = _splitItems.fold<double>(0, (s, item) => s + (item['amount'] as double));
-                      _amountController.text = sum.toStringAsFixed(2);
+                      // Intentionally do NOT overwrite _amountController.text to preserve target bill!
                     });
                     Navigator.of(ctx).pop();
                   }
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-                child: const Text('เพิ่มรายการย่อย'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('เพิ่มรายการ'),
               ),
             ],
           );
@@ -668,6 +766,10 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       final storageRepo = ref.read(storageRepositoryProvider);
 
       if (_isSplitBill && _splitItems.isNotEmpty) {
+        final totalBill = double.tryParse(_amountController.text.trim()) ?? 0.0;
+        final allocatedSum = _splitItems.fold<double>(0.0, (s, item) => s + (item['amount'] as double));
+        final remaining = totalBill - allocatedSum;
+
         // Multi-category bill split submission
         for (var item in _splitItems) {
           final txId = const Uuid().v4();
@@ -679,7 +781,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
             mainCategoryId: item['mainCatId'] as String,
             subCategoryId: item['subCatId'] as String,
             walletId: _selectedWalletId!,
-            note: '${item['name']} (สลิปรวมบิล)',
+            note: '${item['name']}${_noteController.text.trim().isNotEmpty ? " (${_noteController.text.trim()})" : ""}',
             loveNote: _loveNoteController.text.trim().isNotEmpty ? _loveNoteController.text.trim() : null,
             receiptImageUrl: _existingImageUrl,
             isTaxDeductible: _isTaxDeductible,
@@ -690,6 +792,33 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
             updatedAt: DateTime.now(),
           );
           await notifier.addTransaction(tx, receiptFile: _selectedImageFile, storageRepo: storageRepo);
+        }
+
+        // Auto-allocate remaining balance if any positive remainder exists
+        if (remaining > 0.01) {
+          final mainCats = ref.read(mainCategoriesProvider);
+          final subCats = ref.read(subCategoriesProvider);
+          final defaultMain = _selectedMainCategoryId ?? (mainCats.isNotEmpty ? mainCats.first.id : '');
+          final defaultSub = _selectedSubCategoryId ?? (subCats.isNotEmpty ? subCats.first.id : '');
+          final remainderTx = TransactionItem(
+            id: const Uuid().v4(),
+            type: _isIncome ? 'income' : 'expense',
+            amount: remaining,
+            date: _selectedDate,
+            mainCategoryId: defaultMain,
+            subCategoryId: defaultSub,
+            walletId: _selectedWalletId!,
+            note: 'รายการอื่นๆ ในบิล${_noteController.text.trim().isNotEmpty ? " (${_noteController.text.trim()})" : ""}',
+            loveNote: _loveNoteController.text.trim().isNotEmpty ? _loveNoteController.text.trim() : null,
+            receiptImageUrl: _existingImageUrl,
+            isTaxDeductible: _isTaxDeductible,
+            createdByUserId: userProfile?.id,
+            createdByName: userProfile?.nickname ?? 'ผู้ใช้',
+            createdByPhoto: userProfile?.photoBase64,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+          await notifier.addTransaction(remainderTx, receiptFile: _selectedImageFile, storageRepo: storageRepo);
         }
       } else {
         // Single transaction submission
@@ -704,7 +833,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
           mainCategoryId: _selectedMainCategoryId!,
           subCategoryId: _selectedSubCategoryId!,
           walletId: _selectedWalletId!,
-          note: _noteController.text.trim(),
+          note: _noteController.text.trim().isNotEmpty ? _noteController.text.trim() : null,
           loveNote: _loveNoteController.text.trim().isNotEmpty ? _loveNoteController.text.trim() : null,
           receiptImageUrl: _existingImageUrl,
           isTaxDeductible: _isTaxDeductible,
@@ -720,6 +849,17 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
         } else {
           await notifier.updateTransaction(transaction, receiptFile: _selectedImageFile, storageRepo: storageRepo);
         }
+      }
+
+      // Quiet Background AI Merchant Learning (Max 5 samples per receiver name)
+      if (_detectedReceiverName != null && _selectedMainCategoryId != null) {
+        final coupleRoomId = ref.read(coupleRoomIdProvider);
+        MerchantLearningService.learnMerchantCategory(
+          receiverOrMerchantName: _detectedReceiverName!,
+          mainCategoryId: _selectedMainCategoryId!,
+          subCategoryId: _selectedSubCategoryId,
+          householdId: coupleRoomId,
+        );
       }
 
       if (mounted) {
@@ -917,67 +1057,206 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
 
                     // Split Items List view (if Split Bill mode active)
                     if (_isSplitBill) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('รายการย่อยในบิลนี้:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                TextButton.icon(
-                                  onPressed: _addSplitItemDialog,
-                                  icon: const Icon(Icons.add, size: 16),
-                                  label: const Text('➕ เพิ่มรายการย่อย', style: TextStyle(fontSize: 11)),
+                      Builder(
+                        builder: (context) {
+                          final totalBill = double.tryParse(_amountController.text.trim()) ?? 0.0;
+                          final allocatedSum = _splitItems.fold<double>(0.0, (s, item) => s + (item['amount'] as double));
+                          final remaining = totalBill - allocatedSum;
+
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.03),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
                                 ),
                               ],
                             ),
-                            if (_splitItems.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 8.0),
-                                child: Text('ยังไม่มีรายการย่อย กดปุ่มด้านบนเพื่อแยกหมวดหมู่', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                              )
-                            else
-                              Column(
-                                children: _splitItems.asMap().entries.map((entry) {
-                                  final idx = entry.key;
-                                  final item = entry.value;
-                                  final mainCat = mainCats.firstWhere((c) => c.id == item['mainCatId'], orElse: () => mainCats.first);
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // 3 Metric Columns Overview
+                                Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildMetricTile('ยอดรวมบิล', '฿${totalBill.toStringAsFixed(2)}', theme.colorScheme.onSurface),
+                                      ),
+                                      Container(width: 1, height: 32, color: theme.colorScheme.outlineVariant),
+                                      Expanded(
+                                        child: _buildMetricTile('จัดสรรแล้ว (${_splitItems.length})', '฿${allocatedSum.toStringAsFixed(2)}', AppColors.primary),
+                                      ),
+                                      Container(width: 1, height: 32, color: theme.colorScheme.outlineVariant),
+                                      Expanded(
+                                        child: _buildMetricTile(
+                                          'คงเหลือที่ยังขาด',
+                                          '฿${remaining > 0 ? remaining.toStringAsFixed(2) : (remaining.abs() < 0.01 ? "0.00" : "-${(-remaining).toStringAsFixed(2)}")}',
+                                          remaining > 0.01
+                                              ? Colors.orange.shade800
+                                              : (remaining.abs() < 0.01 ? Colors.green.shade700 : Colors.red.shade700),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
 
-                                  return Card(
-                                    margin: const EdgeInsets.symmetric(vertical: 4),
-                                    child: ListTile(
-                                      leading: Text(mainCat.emoji, style: const TextStyle(fontSize: 20)),
-                                      title: Text(item['name'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                      subtitle: Text(mainCat.name, style: const TextStyle(fontSize: 11)),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text('฿${(item['amount'] as double).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete, size: 16, color: AppColors.expense),
-                                            onPressed: () {
-                                              setState(() {
-                                                _splitItems.removeAt(idx);
-                                                final sum = _splitItems.fold<double>(0, (s, i) => s + (i['amount'] as double));
-                                                _amountController.text = sum.toStringAsFixed(2);
-                                              });
-                                            },
+                                // Smart Status Banner / Badge
+                                if (remaining > 0.01)
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade50,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: Colors.amber.shade300),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.info_outline, size: 16, color: Colors.amber),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'ยังขาดอีก ฿${remaining.toStringAsFixed(2)} กรุณากด "+ เพิ่มรายการย่อย" ให้ครบยอดบิล',
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
                                           ),
-                                        ],
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else if (remaining.abs() < 0.01 && _splitItems.isNotEmpty)
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade50,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: Colors.green.shade300),
+                                    ),
+                                    child: const Row(
+                                      children: [
+                                        Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
+                                        SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            '🎉 จัดสรรยอดเงินครบถ้วน 100% พอดีกับบิลแล้ว!',
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else if (remaining < -0.01)
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade50,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: Colors.red.shade300),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.warning_amber_rounded, size: 16, color: Colors.red),
+                                        SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            '⚠️ ยอดรวมรายการย่อยเกินยอดบิลอยู่ ฿${(-remaining).toStringAsFixed(2)}',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                const SizedBox(height: 12),
+
+                                // Section Header + Add Button
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('รายการย่อยในบิลนี้:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                    ElevatedButton.icon(
+                                      onPressed: _addSplitItemDialog,
+                                      icon: const Icon(Icons.add, size: 16),
+                                      label: const Text('เพิ่มรายการย่อย', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.primary,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                       ),
                                     ),
-                                  );
-                                }).toList(),
-                              ),
-                          ],
-                        ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+
+                                if (_splitItems.isEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 12.0),
+                                    child: Center(
+                                      child: Text(
+                                        'ยังไม่มีรายการย่อย กดปุ่ม "เพิ่มรายการย่อย" ด้านบนเพื่อแยกหมวดหมู่',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Column(
+                                    children: _splitItems.asMap().entries.map((entry) {
+                                      final idx = entry.key;
+                                      final item = entry.value;
+                                      final mainCat = mainCats.firstWhere((c) => c.id == item['mainCatId'], orElse: () => mainCats.first);
+
+                                      return Card(
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          side: BorderSide(color: Colors.grey.shade200),
+                                        ),
+                                        margin: const EdgeInsets.symmetric(vertical: 4),
+                                        child: ListTile(
+                                          leading: CircleAvatar(
+                                            backgroundColor: AppColors.primary.withOpacity(0.1),
+                                            child: Text(mainCat.emoji, style: const TextStyle(fontSize: 18)),
+                                          ),
+                                          title: Text(item['name'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                          subtitle: Text(mainCat.name, style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+                                          trailing: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                '฿${(item['amount'] as double).toStringAsFixed(2)}',
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              IconButton(
+                                                icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.expense),
+                                                onPressed: () {
+                                                  setState(() {
+                                                    _splitItems.removeAt(idx);
+                                                  });
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
                     ],
