@@ -36,7 +36,7 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
     // Initial welcome message
     _messages.add({
       'sender': 'ai',
-      'text': '🤖 **สวัสดีครับพี่ต๋อง & น้องฝน! ผมคือ AI ที่ปรึกษาการเงินคู่รัก Kapookluxx** 💕\n\n'
+      'text': '🤖 **สวัสดีครับต๋อง & ฝน! ผมคือ AI ที่ปรึกษาการเงินคู่รัก Kapookluxx** 💕\n\n'
           'มีอะไรให้ผมช่วยสรุป วิเคราะห์หมวดย่อย หรือวางแผนงบประมาณคู่รักในวันนี้ไหมครับ?'
     });
     _checkApiKeyStatus();
@@ -155,8 +155,8 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
       categories: categories,
       subCategories: subCategories,
       subcategoryBudgets: subcategoryBudgets,
-      currentUserName: userProfile?.nickname ?? 'พี่ต๋อง',
-      partnerName: partnerProfile?.nickname ?? 'น้องฝน',
+      currentUserName: userProfile?.nickname ?? 'ต๋อง',
+      partnerName: partnerProfile?.nickname ?? 'ฝน',
     );
 
     if (mounted) {
@@ -249,7 +249,7 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
                         ],
                       ),
                       const Text(
-                        'วิเคราะห์หมวดย่อย คุมงบ และตอบคำถามพี่ต๋อง&น้องฝน',
+                        'วิเคราะห์หมวดย่อย คุมงบ และตอบคำถามต๋อง & ฝน',
                         style: TextStyle(fontSize: 11, color: Colors.grey),
                       ),
                     ],
@@ -294,7 +294,7 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
                           ),
                           const SizedBox(width: 10),
                           Text(
-                            _hasGeminiKey ? '🤖 Gemini กำลังวิเคราะห์คำตอบ...' : '🤖 AI กำลังประมวลผล...',
+                            _hasGeminiKey ? '🤖 Gemini กำลังคิดคำตอบให้ต๋อง & ฝน...' : '🤖 AI กำลังประมวลผล...',
                             style: const TextStyle(fontSize: 12, color: Colors.grey),
                           ),
                         ],
