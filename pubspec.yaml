@@ -60,6 +60,7 @@ dependencies:
   share_plus: ^10.0.0
   google_fonts: ^6.2.1
   shared_preferences: ^2.2.3
+  http: ^1.2.2
 
 dev_dependencies:
   flutter_test:
