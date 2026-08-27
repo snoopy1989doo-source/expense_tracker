@@ -43,6 +43,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   File? _selectedImageFile;
   Uint8List? _selectedImageBytes;
   String? _existingImageUrl;
+  final List<String> _receiptImagesList = []; // Multi-image support
   bool _isSaving = false;
 
   // Split Bill / Multi-Category Breakdown mode 🔀
@@ -66,12 +67,51 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       _selectedWalletId = tx.walletId;
       _isTaxDeductible = tx.isTaxDeductible;
       _existingImageUrl = tx.receiptImageUrl;
+      if (_existingImageUrl != null && _existingImageUrl!.isNotEmpty) {
+        _receiptImagesList.add(_existingImageUrl!);
+      }
       if (_existingImageUrl != null && _existingImageUrl!.startsWith('data:image')) {
         try {
           _selectedImageBytes = base64Decode(_existingImageUrl!.split(',').last);
         } catch (_) {}
       }
     }
+  }
+
+  void _showImagePreviewDialog(String imageStr) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: imageStr.startsWith('data:image')
+                    ? Image.memory(base64Decode(imageStr.split(',').last), fit: BoxFit.contain)
+                    : (imageStr.startsWith('http')
+                        ? Image.network(imageStr, fit: BoxFit.contain)
+                        : Image.file(File(imageStr), fit: BoxFit.contain)),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: CircleAvatar(
+                backgroundColor: Colors.black.withOpacity(0.7),
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -96,6 +136,9 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
           _selectedImageFile = File(pickedFile.path);
           _selectedImageBytes = bytes;
           _existingImageUrl = base64Str;
+          if (!_receiptImagesList.contains(base64Str)) {
+            _receiptImagesList.add(base64Str);
+          }
         });
         _analyzeSlipAndAutoFill(pickedFile.name, bytes, base64Str);
       }
@@ -143,14 +186,26 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     String? matchedNote;
     double? matchedAmount;
 
-    final amountRegex = RegExp(r'(\d{1,3}(?:,\d{3})*\.\d{2})');
-    final matches = amountRegex.allMatches(extractedText);
-    for (var m in matches) {
-      final parsed = double.tryParse(m.group(1)!.replaceAll(',', ''));
-      if (parsed != null && parsed > 0) {
-        matchedAmount = parsed;
-        break;
+    // Multi-regex for amount extraction in Thai bank slips
+    final amountRegexes = [
+      RegExp(r'(?:จำนวน(?:เงิน)?|ยอดเงิน|baht|thb|฿)\s*:?\s*(\d{1,6}(?:,\d{3})*(?:\.\d{1,2})?)', caseSensitive: false),
+      RegExp(r'(\d{1,6}(?:,\d{3})*\.\d{2})'),
+      RegExp(r'(\d{1,6}\.\d{2})'),
+    ];
+
+    for (var regex in amountRegexes) {
+      final matches = regex.allMatches(extractedText);
+      for (var m in matches) {
+        final rawStr = m.group(1)?.replaceAll(',', '');
+        if (rawStr != null) {
+          final parsed = double.tryParse(rawStr);
+          if (parsed != null && parsed > 0) {
+            matchedAmount = parsed;
+            break;
+          }
+        }
       }
+      if (matchedAmount != null) break;
     }
 
     if (fullTextToScan.contains('pea') || fullTextToScan.contains('ไฟฟ้า') || fullTextToScan.contains('ภูมิภาค')) {
@@ -1039,92 +1094,95 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                     ),
                     const SizedBox(height: 20),
 
-                    // Receipt Upload section
-                    const Text('รูปภาพใบเสร็จ / หลักฐานการจ่ายเงิน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    // Receipt Upload section (Compact Happy-Money 60x60 thumbnail style)
+                    const Text('รูปภาพใบเสร็จ / หลักฐานการจ่ายเงิน (แนบได้หลายรูป)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     const SizedBox(height: 10),
-                    InkWell(
-                      onTap: _showImagePickerOptions,
-                      child: Container(
-                        height: 160,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: theme.colorScheme.outlineVariant, style: BorderStyle.values[1]),
-                          borderRadius: BorderRadius.circular(16),
-                          color: theme.colorScheme.surface,
-                        ),
-                        child: _selectedImageBytes != null
-                            ? Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(15),
-                                    child: Image.memory(
-                                      _selectedImageBytes!,
-                                      width: double.infinity,
-                                      height: 160,
-                                      fit: BoxFit.cover,
-                                    ),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        ..._receiptImagesList.asMap().entries.map((entry) {
+                          final idx = entry.key;
+                          final imgStr = entry.value;
+
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              GestureDetector(
+                                onTap: () => _showImagePreviewDialog(imgStr),
+                                child: Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppColors.primary.withOpacity(0.4), width: 1.5),
+                                    boxShadow: [
+                                      BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4, offset: const Offset(0, 2)),
+                                    ],
                                   ),
-                                  Positioned(
-                                    right: 8,
-                                    top: 8,
-                                    child: CircleAvatar(
-                                      backgroundColor: Colors.black.withOpacity(0.6),
-                                      child: IconButton(
-                                        icon: const Icon(Icons.delete, color: Colors.white),
-                                        onPressed: () => setState(() {
-                                          _selectedImageFile = null;
-                                          _selectedImageBytes = null;
-                                          _existingImageUrl = null;
-                                        }),
-                                      ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: imgStr.startsWith('data:image')
+                                        ? Image.memory(base64Decode(imgStr.split(',').last), fit: BoxFit.cover)
+                                        : (imgStr.startsWith('http')
+                                            ? Image.network(imgStr, fit: BoxFit.cover)
+                                            : Image.file(File(imgStr), fit: BoxFit.cover)),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: -6,
+                                right: -6,
+                                child: GestureDetector(
+                                  onTap: () => setState(() {
+                                    _receiptImagesList.removeAt(idx);
+                                    if (_receiptImagesList.isEmpty) {
+                                      _selectedImageFile = null;
+                                      _selectedImageBytes = null;
+                                      _existingImageUrl = null;
+                                    } else {
+                                      _existingImageUrl = _receiptImagesList.last;
+                                    }
+                                  }),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
                                     ),
-                                  )
-                                ],
-                              )
-                            : (_existingImageUrl != null
-                                ? Stack(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(15),
-                                        child: _existingImageUrl!.startsWith('data:image')
-                                            ? Image.memory(
-                                                base64Decode(_existingImageUrl!.split(',').last),
-                                                width: double.infinity,
-                                                height: 160,
-                                                fit: BoxFit.cover,
-                                              )
-                                            : (_existingImageUrl!.startsWith('http')
-                                                ? Image.network(_existingImageUrl!, width: double.infinity, height: 160, fit: BoxFit.cover)
-                                                : Image.file(File(_existingImageUrl!), width: double.infinity, height: 160, fit: BoxFit.cover)),
-                                      ),
-                                      Positioned(
-                                        right: 8,
-                                        top: 8,
-                                        child: CircleAvatar(
-                                          backgroundColor: Colors.black.withOpacity(0.6),
-                                          child: IconButton(
-                                            icon: const Icon(Icons.delete, color: Colors.white),
-                                            onPressed: () => setState(() {
-                                              _selectedImageFile = null;
-                                              _selectedImageBytes = null;
-                                              _existingImageUrl = null;
-                                            }),
-                                          ),
-                                        ),
-                                      )
-                                    ],
-                                  )
-                                : Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.add_photo_alternate, size: 40, color: theme.colorScheme.primary.withOpacity(0.6)),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'กดที่นี่เพื่อถ่ายรูปหรือแนบใบเสร็จ',
-                                        style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface.withOpacity(0.5)),
-                                      ),
-                                    ],
-                                  )),
-                      ),
+                                    child: const Icon(Icons.close, size: 12, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
+
+                        // Add photo button (+)
+                        GestureDetector(
+                          onTap: _showImagePickerOptions,
+                          child: Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: theme.colorScheme.outlineVariant, style: BorderStyle.values[1]),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_a_photo, size: 20, color: theme.colorScheme.primary.withOpacity(0.7)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'เพิ่มรูป',
+                                  style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 32),
 

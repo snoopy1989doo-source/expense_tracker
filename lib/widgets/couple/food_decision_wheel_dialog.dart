@@ -372,7 +372,7 @@ class _FoodDecisionWheelDialogState extends ConsumerState<FoodDecisionWheelDialo
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       Text(
-                        'วงล้อสุ่มมื้ออาหาร (ซิงก์ Firebase แสดงทั้งคู่)',
+                        'วงล้อสุ่มมื้ออาหารแก้ปัญหายอดฮิตคู่รัก',
                         style: TextStyle(fontSize: 11, color: Colors.grey),
                       ),
                     ],

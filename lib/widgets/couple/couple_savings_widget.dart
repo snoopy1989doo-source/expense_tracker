@@ -212,13 +212,12 @@ class _CoupleSavingsWidgetState extends ConsumerState<CoupleSavingsWidget> {
           ElevatedButton(
             onPressed: () async {
               final roomId = ref.read(coupleRoomIdProvider);
-              if (roomId != null) {
+              if (roomId != null && goal.id.isNotEmpty && !goal.id.startsWith('default_')) {
                 await ref.read(savingsGoalRepositoryProvider).deleteSavingsGoal(roomId, goal.id);
-              } else {
-                setState(() {
-                  _localGoals.removeWhere((g) => g.id == goal.id);
-                });
               }
+              setState(() {
+                _localGoals.removeWhere((g) => g.id == goal.id || (g.title == goal.title && g.targetAmount == goal.targetAmount));
+              });
 
               if (ctx.mounted) Navigator.of(ctx).pop();
               if (mounted) {

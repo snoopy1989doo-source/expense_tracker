@@ -174,6 +174,11 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
                 ActionChip(
+                  label: const Text('📊 ใช้เงินหมวดอะไรเยอะสุด?', style: TextStyle(fontSize: 11)),
+                  onPressed: () => _sendMessage('ใช้เงินหมวดอะไรเยอะสุด'),
+                ),
+                const SizedBox(width: 6),
+                ActionChip(
                   label: const Text('💰 เดือนนี้เราใช้เงินเท่าไหร่?', style: TextStyle(fontSize: 11)),
                   onPressed: () => _sendMessage('เดือนนี้เราใช้เงินเท่าไหร่'),
                 ),
@@ -184,8 +189,8 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
                 ),
                 const SizedBox(width: 6),
                 ActionChip(
-                  label: const Text('🍚 หมวดอาหารใช้ไปเท่าไหร่?', style: TextStyle(fontSize: 11)),
-                  onPressed: () => _sendMessage('ค่าอาหารเดือนนี้เท่าไหร่'),
+                  label: const Text('🔮 ทำนายบิลล่วงหน้า', style: TextStyle(fontSize: 11)),
+                  onPressed: () => _sendMessage('ทำนายบิลล่วงหน้า'),
                 ),
               ],
             ),
