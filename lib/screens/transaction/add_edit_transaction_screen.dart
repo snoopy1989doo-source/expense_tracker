@@ -193,11 +193,11 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       matchedAmount = double.tryParse(str ?? '');
     }
 
-    // Tier 2: Direct Keyword + Amount (Thai & English)
+    // Tier 2: Direct Keyword + Amount (Thai & English + OCR character variants)
     if (matchedAmount == null) {
       final tier2Regexes = [
         RegExp(r'(?:จำนวน(?:เงิน)?|ยอดเงิน|ยอดโอน|ยอดรวม|โอนเงิน|จ่ายเงิน|ชำระเงิน|amount|total|paid|transfer|sum|net|payment|subtotal|grand\s*total)\s*:?\s*(\d{1,6}(?:,\d{3})*(?:\.\d{1,2})?)', caseSensitive: false),
-        RegExp(r'(\d{1,6}(?:,\d{3})*\.\d{2})\s*(?:บาท|thb|baht|฿|usd)', caseSensitive: false),
+        RegExp(r'(\d{1,6}(?:,\d{3})*\.\d{2})\s*(?:บาท|thb|baht|฿|usd|un|vn|bade|ble)', caseSensitive: false),
       ];
 
       for (var regex in tier2Regexes) {

@@ -42,7 +42,6 @@
           const amtStr = tag54Match[2].substring(0, len);
           const amt = parseFloat(amtStr);
           if (!isNaN(amt) && amt > 0 && amt < 1000000) {
-            console.log("🎉 Tag 54 Amount Extracted:", amt);
             return amt;
           }
         }
@@ -56,17 +55,9 @@
           const amtStr = itmxMatch[2].substring(0, len);
           const amt = parseFloat(amtStr);
           if (!isNaN(amt) && amt > 0 && amt < 1000000) {
-            console.log("🎉 ITMX Sub-tag Amount Extracted:", amt);
             return amt;
           }
         }
-      }
-
-      // 3. Bank Verification URL Query parameters (e.g. ?amount=130.00 or &amt=130.00)
-      const urlMatch = qrData.match(/(?:amount|amt|val|a)=(\d+\.?\d*)/i);
-      if (urlMatch) {
-        const amt = parseFloat(urlMatch[1]);
-        if (!isNaN(amt) && amt > 0) return amt;
       }
 
       return null;
@@ -129,35 +120,9 @@
       return null;
     }
 
-    // High Contrast Canvas Binarization for OCR
-    function getBinarizedImageBase64(img) {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imgData.data;
-
-        for (let i = 0; i < data.length; i += 4) {
-          const avg = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-          const val = avg < 165 ? 0 : 255;
-          data[i] = val;
-          data[i + 1] = val;
-          data[i + 2] = val;
-        }
-
-        ctx.putImageData(imgData, 0, 0);
-        return canvas.toDataURL('image/png');
-      } catch (e) {
-        return img.src;
-      }
-    }
-
     window.parseSlipOCR = async function(base64Image) {
-      console.log("⚡ Starting PromptParse Multi-Pass Slip Scan...");
+      console.log("⚡ Starting Hybrid QR + OCR Scan Pipeline...");
+      let combinedText = "";
 
       const img = new Image();
       img.src = base64Image;
@@ -166,35 +131,36 @@
         img.onerror = resolve;
       });
 
-      // 1. Multi-Pass QR Code Detection + ITMX / PromptParse Payload Decoder
+      // 1. QR Code Scan (Multi-Pass)
       try {
         const rawQrData = scanQRMultiPass(img);
         if (rawQrData) {
-          console.log("🎉 QR Code Found:", rawQrData);
+          console.log("🎉 QR Found:", rawQrData);
+          combinedText += "QR_DATA: " + rawQrData + "\n";
           const amount = decodeThaiSlipQR(rawQrData);
           if (amount) {
-            console.log("✨ Extracted Slip Amount from QR Payload:", amount);
-            return "จำนวนเงิน " + amount.toFixed(2) + " บาท\n" + rawQrData;
+            combinedText += "จำนวนเงิน " + amount.toFixed(2) + " บาท\n";
           }
         }
       } catch (qrErr) {
         console.warn("QR Scan Exception:", qrErr);
       }
 
-      // 2. High-Contrast Binarization + Tesseract OCR Fallback
+      // 2. High-Speed Tesseract OCR
       try {
         if (window.Tesseract) {
-          const processedImage = getBinarizedImageBase64(img);
           const worker = await Tesseract.createWorker('eng');
-          const ret = await worker.recognize(processedImage);
+          const ret = await worker.recognize(base64Image);
           await worker.terminate();
-          console.log("✅ High-Contrast OCR Extracted Text:\n", ret.data.text);
-          return ret.data.text || "";
+          console.log("✅ OCR Raw Extracted Text:\n", ret.data.text);
+          combinedText += "\nOCR_TEXT:\n" + (ret.data.text || "");
         }
       } catch (e) {
-        console.error("❌ OCR Fallback Error:", e);
+        console.error("❌ OCR Exception:", e);
       }
-      return "";
+
+      console.log("⚡ Full Hybrid Pipeline Output:\n", combinedText);
+      return combinedText;
     };
   </script>
 </head>
