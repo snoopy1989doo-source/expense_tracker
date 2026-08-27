@@ -181,6 +181,18 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
                 ActionChip(
+                  avatar: const Icon(Icons.favorite, size: 14, color: AppColors.primary),
+                  label: const Text('💖 วันสำคัญคู่เรา (ต๋อง&ฝน)', style: TextStyle(fontSize: 11)),
+                  onPressed: () => _sendMessage('วันสำคัญของคู่เรา'),
+                ),
+                const SizedBox(width: 6),
+                ActionChip(
+                  avatar: const Icon(Icons.pets, size: 14, color: Colors.orange),
+                  label: const Text('🐱 ค่าใช้จ่ายกังฟู & โอเลี้ยง', style: TextStyle(fontSize: 11)),
+                  onPressed: () => _sendMessage('ค่าใช้จ่ายน้องแมว (กังฟู & โอเลี้ยง)'),
+                ),
+                const SizedBox(width: 6),
+                ActionChip(
                   avatar: const Icon(Icons.category, size: 14, color: AppColors.primary),
                   label: const Text('🏷️ หมวดย่อยใช้อะไรเยอะสุด?', style: TextStyle(fontSize: 11)),
                   onPressed: () => _sendMessage('หมวดย่อยใช้อะไรเยอะสุด'),

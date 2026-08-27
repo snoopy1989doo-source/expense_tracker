@@ -572,12 +572,76 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
     final luckyColor = luckyColors[(seed * 5 + 3) % luckyColors.length];
     final luckyNumber = ((seed * 7 + 11) % 90 + 10).toString();
 
+    // D-Day Love Anniversary calculation (17 Jan 2023)
+    final daysTogether = now.difference(DateTime(2023, 1, 17)).inDays;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Love Anniversary & D-Day Banner: ต๋อง & ฝน
+            Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.pink.shade50,
+                    Colors.purple.shade50,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.pink.shade200.withOpacity(0.8), width: 1.2),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Text('💖', style: TextStyle(fontSize: 18)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              'ต๋อง & ฝน',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'คบกันมาแล้ว $daysTogether วัน 💕',
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'ครบรอบ 17 ม.ค. | วันเกิดฝน 15 ม.ค. | กังฟู & โอเลี้ยง 🐱🐾',
+                          style: TextStyle(fontSize: 10, color: Colors.brown),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // Daily Fortune Scores Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

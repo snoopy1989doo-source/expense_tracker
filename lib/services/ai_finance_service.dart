@@ -218,7 +218,52 @@ class AIFinanceService {
       return buffer.toString();
     }
 
-    // 4. Query: Total expenses / Summary
+    // 4. Query: D-Day / Special Anniversaries & Birthdays
+    if (cleanQuery.contains('วันสำคัญ') || cleanQuery.contains('วันเกิด') || cleanQuery.contains('ครบรอบ') || cleanQuery.contains('คบ') || cleanQuery.contains('กี่วัน')) {
+      final now = DateTime.now();
+      final anniversary = DateTime(2023, 1, 17);
+      final daysTogether = now.difference(anniversary).inDays;
+
+      // Next birthdays
+      final thisYear = now.year;
+      var nextFonBirthday = DateTime(thisYear, 1, 15);
+      if (nextFonBirthday.isBefore(now)) {
+        nextFonBirthday = DateTime(thisYear + 1, 1, 15);
+      }
+      final daysToFon = nextFonBirthday.difference(now).inDays + 1;
+
+      var nextTongBirthday = DateTime(thisYear, 1, 17);
+      if (nextTongBirthday.isBefore(now)) {
+        nextTongBirthday = DateTime(thisYear + 1, 1, 17);
+      }
+      final daysToTong = nextTongBirthday.difference(now).inDays + 1;
+
+      return '💖 **วันสำคัญของคู่รัก ต๋อง & ฝน:**\n\n'
+          '• 👩‍❤️‍👨 **วันครบรอบเป็นแฟนกัน:** 17 มกราคม 2566\n'
+          '  👉 **คบกันมาแล้ว:** **$daysTogether วัน** แห่งความรักและความผูกพัน! 💕\n\n'
+          '• 🎂 **วันเกิดน้องฝน:** 15 มกราคม *(อีกประมาณ $daysToFon วัน)*\n'
+          '• 🎂 **วันเกิดพี่ต๋อง & วันครบรอบ:** 17 มกราคม *(อีกประมาณ $daysToTong วัน)*\n'
+          '• 🐱 **สมาชิกสี่ขา:** น้องกังฟู 🥋 และ น้องโอเลี้ยง ☕🐾\n\n'
+          '💡 *คำแนะนำ:* เริ่มหยอดกระปุกของขวัญวันเกิดและวันครบรอบเดือนละนิด เพื่อเซอร์ไพรส์แฟนแบบสบายกระเป๋าได้เลยครับ! ✨';
+    }
+
+    // 5. Query: Cats (กังฟู & โอเลี้ยง)
+    if (cleanQuery.contains('แมว') || cleanQuery.contains('กังฟู') || cleanQuery.contains('โอเลี้ยง')) {
+      double catExpense = 0;
+      for (var t in expenses) {
+        final note = t.note?.toLowerCase() ?? '';
+        final subName = subCatMap[t.subCategoryId ?? '']?.name.toLowerCase() ?? '';
+        if (note.contains('แมว') || note.contains('กังฟู') || note.contains('โอเลี้ยง') || note.contains('ทราย') || note.contains('อาหารแมว') || subName.contains('แมว')) {
+          catExpense += t.amount;
+        }
+      }
+      return '🐱🐾 **รายงานค่าดูแลน้องแมว (กังฟู & โอเลี้ยง):**\n\n'
+          '• ยอดค่าใช้จ่ายดูแลน้องแมวในเดือนนี้: **${CurrencyFormatter.format(catExpense)}**\n'
+          '• สมาชิกตัวแสบ: **กังฟู** 🥋 (สุดคึก) และ **โอเลี้ยง** ☕ (แมวดำสุดอ้อน)\n\n'
+          '${catExpense > 0 ? "ดูแลลูกๆ ได้ดีมากครับ อย่าลืมกอดและให้รางวัลขนมแมวเลียด้วยนะคร้าบ 💕" : "ยังไม่มีรายการค่าอาหารหรือทรายแมวบันทึกเข้ามาในเดือนนี้ครับ"}';
+    }
+
+    // 6. Query: Total expenses / Summary
     if (cleanQuery.contains('เท่าไหร่') || cleanQuery.contains('สรุป') || cleanQuery.contains('เดือนนี้')) {
       if (expenses.isEmpty) {
         return '💕 ในเดือนนี้คู่ของคุณยังไม่มีบันทึกรายจ่ายเข้ามาเลยครับ เริ่มต้นจดบันทึกเพื่อติดตามงบด้วยกันได้เลย!';
@@ -230,7 +275,7 @@ class AIFinanceService {
           '${netBalance >= 0 ? "เก่งมากครับ! เดือนนี้คุมงบได้ดีเยี่ยม มีเงินเหลือออมด้วยนะ 💕" : "เดือนนี้รายจ่ายค่อนข้างสูง ลองช่วยกันคุมงบมื้อเย็นเพิ่มเติมดูนะครับ ✌️"}';
     }
 
-    // 5. Query: Predictions
+    // 7. Query: Predictions
     if (cleanQuery.contains('ทำนาย') || cleanQuery.contains('ล่วงหน้า') || cleanQuery.contains('อนาคต')) {
       final predictions = predictUpcomingExpenses(transactions);
       final buffer = StringBuffer('🔮 **ผลวิเคราะห์ทำนายบิลล่วงหน้าของ AI:**\n\n');
@@ -241,13 +286,14 @@ class AIFinanceService {
     }
 
     // Default friendly response
-    return '🤖 **สวัสดีครับ! ผมคือ AI ที่ปรึกษาการเงินคู่รัก Kapookluxx** 💕\n\n'
-        'เดือนนี้คู่ของคุณใช้จ่ายรวม **${CurrencyFormatter.format(totalExpense)}** '
-        'คุณสามารถถามผมเพิ่มเติมได้ เช่น:\n'
-        '• *"หมวดย่อยใช้อะไรเยอะสุด?"*\n'
-        '• *"เช็กสถานะงบประมาณหมวดย่อย"*\n'
-        '• *"ใครจ่ายเงินมากกว่ากันในเดือนนี้?"*\n'
-        '• *"สรุปรายรับรายจ่ายเดือนนี้"*';
+    return '🤖 **สวัสดีครับพี่ต๋อง & น้องฝน! ผมคือ AI ที่ปรึกษาการเงินคู่รัก Kapookluxx** 💕\n\n'
+        'เดือนนี้คู่ของเราใช้จ่ายรวม **${CurrencyFormatter.format(totalExpense)}** '
+        'สามารถถามผมเพิ่มเติมได้เลยครับ เช่น:\n'
+        '• *"วันสำคัญของคู่เรา"* 💖\n'
+        '• *"ค่าใช้จ่ายน้องแมว (กังฟู & โอเลี้ยง)"* 🐱\n'
+        '• *"หมวดย่อยใช้อะไรเยอะสุด?"* 🏷️\n'
+        '• *"เช็กสถานะงบประมาณหมวดย่อย"* 🎯\n'
+        '• *"ใครจ่ายเงินมากกว่ากันในเดือนนี้?"* 👫';
   }
 
   /// AI Expense Predictor Engine
