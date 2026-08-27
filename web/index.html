@@ -29,7 +29,7 @@
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <script>
-    // Strict EMVCo TLV Parser (Tag-Length-Value) to prevent picking fake "54" inside Ref IDs
+    // Strict EMVCo TLV Parser (Tag-Length-Value)
     function parseEMVCoTags(qrData) {
       let idx = 0;
       const tags = {};
@@ -44,18 +44,45 @@
       return tags;
     }
 
-    window.parseSlipOCR = async function(base64Image) {
-      console.log("⚡ Starting Instant Slip Scan...");
-
-      // 1. Ultra-fast QR Code TLV Decoding (0.01s Instant Detection)
+    // High contrast canvas binarization for crisp text extraction from pastel bank slips
+    function getBinarizedImageBase64(img) {
       try {
-        const img = new Image();
-        img.src = base64Image;
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-        });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
 
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imgData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const avg = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          const val = avg < 165 ? 0 : 255;
+          data[i] = val;
+          data[i + 1] = val;
+          data[i + 2] = val;
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        return canvas.toDataURL('image/png');
+      } catch (e) {
+        return img.src;
+      }
+    }
+
+    window.parseSlipOCR = async function(base64Image) {
+      console.log("⚡ Starting Ultra-High Accuracy Slip Scan...");
+
+      const img = new Image();
+      img.src = base64Image;
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+      });
+
+      // 1. Ultra-fast QR Code Detection (0.01s Instant Detection)
+      try {
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
@@ -68,9 +95,11 @@
           if (code && code.data) {
             console.log("🎉 Instant QR Code Scanned:", code.data);
 
-            // Parse EMVCo tags strictly
-            if (code.data.startsWith("0002")) {
-              const tags = parseEMVCoTags(code.data);
+            // Locate EMVCo 000201 tag anywhere in QR payload
+            const emvIdx = code.data.indexOf("000201");
+            if (emvIdx !== -1) {
+              const emvPayload = code.data.substring(emvIdx);
+              const tags = parseEMVCoTags(emvPayload);
               if (tags["54"]) {
                 const amt = parseFloat(tags["54"]);
                 if (!isNaN(amt) && amt > 0 && amt < 1000000) {
@@ -85,13 +114,14 @@
         console.warn("QR Scan Exception:", qrErr);
       }
 
-      // 2. Tesseract OCR Fallback (if no QR code or non-EMVCo QR)
+      // 2. High-Contrast Binarization + Tesseract OCR Fallback
       try {
         if (window.Tesseract) {
+          const processedImage = getBinarizedImageBase64(img);
           const worker = await Tesseract.createWorker('eng');
-          const ret = await worker.recognize(base64Image);
+          const ret = await worker.recognize(processedImage);
           await worker.terminate();
-          console.log("✅ OCR Fallback Extracted Text:\n", ret.data.text);
+          console.log("✅ High-Contrast OCR Extracted Text:\n", ret.data.text);
           return ret.data.text || "";
         }
       } catch (e) {
