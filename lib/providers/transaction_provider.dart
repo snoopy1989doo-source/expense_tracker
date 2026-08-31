@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'theme_provider.dart';
 import 'auth_provider.dart';
@@ -151,17 +152,27 @@ final filteredTransactionsProvider = Provider<List<TransactionItem>>((ref) {
 class RawTransactionsNotifier extends StateNotifier<List<TransactionItem>> {
   final TransactionRepository _repository;
   final String? _roomId;
+  StreamSubscription<List<TransactionItem>>? _subscription;
 
   RawTransactionsNotifier(this._repository, this._roomId) : super([]) {
-    loadTransactions();
+    _init();
+  }
+
+  void _init() {
+    if (_roomId == null) return;
+    _subscription = _repository.watchTransactions(_roomId!).listen((list) {
+      state = list;
+    });
   }
 
   Future<void> loadTransactions() async {
-    if (_roomId == null) return;
-    try {
-      final list = await _repository.getTransactions(_roomId);
-      state = list;
-    } catch (_) {}
+    // No-op: transactions are synced automatically via real-time stream subscription
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 
   Future<void> addTransaction(TransactionItem transaction,
@@ -176,7 +187,6 @@ class RawTransactionsNotifier extends StateNotifier<List<TransactionItem>> {
       } catch (_) {}
     }
     await _repository.saveTransaction(_roomId, finalTx);
-    await loadTransactions();
   }
 
   Future<void> updateTransaction(TransactionItem transaction,
@@ -191,18 +201,15 @@ class RawTransactionsNotifier extends StateNotifier<List<TransactionItem>> {
       } catch (_) {}
     }
     await _repository.saveTransaction(_roomId, finalTx);
-    await loadTransactions();
   }
 
   Future<void> deleteTransaction(String transactionId) async {
     if (_roomId == null) return;
     await _repository.deleteTransaction(_roomId, transactionId);
-    await loadTransactions();
   }
 
   Future<void> updateCreatorNameForUser(String userId, String newName) async {
     if (_roomId == null) return;
     await _repository.updateCreatorNameForUser(_roomId, userId, newName);
-    await loadTransactions();
   }
 }

@@ -113,13 +113,15 @@ class OnboardingFlowNotifier extends StateNotifier<OnboardingFlowState> {
       }
     }
 
-    final wallets = DefaultCategoriesData.defaultWallets.map((wData) => Wallet(
+    int currentOrder = 0;
+    final List<Wallet> wallets = DefaultCategoriesData.defaultWallets.map((wData) => Wallet(
       id: wData['id'],
       name: wData['name'],
       color: wData['color'],
       icon: wData['icon'],
       startingBalance: wData['startingBalance'],
       currentBalance: wData['startingBalance'],
+      order: currentOrder++,
       createdAt: DateTime.now(),
     )).toList();
 

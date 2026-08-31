@@ -5,6 +5,7 @@ import '../models/transaction_item.dart';
 
 abstract class TransactionRepository {
   Future<List<TransactionItem>> getTransactions(String roomId);
+  Stream<List<TransactionItem>> watchTransactions(String roomId);
   Future<void> saveTransaction(String roomId, TransactionItem transaction);
   Future<void> deleteTransaction(String roomId, String transactionId);
   Future<void> updateCreatorNameForUser(String roomId, String userId, String newName);
@@ -46,6 +47,26 @@ class FirestoreTransactionRepository implements TransactionRepository {
     } catch (e) {
       return _getLocalTransactions(roomId);
     }
+  }
+
+  @override
+  Stream<List<TransactionItem>> watchTransactions(String roomId) {
+    if (_useLocalMock || roomId == 'guest_user') {
+      // Return a periodic stream that reads from local mock storage
+      return Stream.periodic(const Duration(seconds: 4))
+          .asyncMap((_) => _getLocalTransactions(roomId));
+    }
+    return _firestore!
+        .collection('couple_rooms')
+        .doc(roomId)
+        .collection('transactions')
+        .orderBy('date', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => TransactionItem.fromMap(doc.data(), doc.id))
+          .toList();
+    });
   }
 
   @override
@@ -97,7 +118,7 @@ class FirestoreTransactionRepository implements TransactionRepository {
       }
       if (changed) {
         final key = 'local_transactions_';
-        final encoded = jsonEncode(list.map((t) => t.toMap()).toList());
+        final encoded = jsonEncode(list.map((t) => t.toLocalMap()).toList());
         await _prefs.setString(key, encoded);
       }
       return;
@@ -142,7 +163,7 @@ class FirestoreTransactionRepository implements TransactionRepository {
     } else {
       list.add(transaction);
     }
-    final encoded = jsonEncode(list.map((t) => t.toMap()).toList());
+    final encoded = jsonEncode(list.map((t) => t.toLocalMap()).toList());
     await _prefs.setString(key, encoded);
   }
 
@@ -150,7 +171,7 @@ class FirestoreTransactionRepository implements TransactionRepository {
     final key = 'local_transactions_';
     final list = await _getLocalTransactions(roomId);
     list.removeWhere((t) => t.id == transactionId);
-    final encoded = jsonEncode(list.map((t) => t.toMap()).toList());
+    final encoded = jsonEncode(list.map((t) => t.toLocalMap()).toList());
     await _prefs.setString(key, encoded);
   }
 }

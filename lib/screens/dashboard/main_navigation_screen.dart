@@ -19,6 +19,9 @@ class MainNavigationScreen extends ConsumerStatefulWidget {
 class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   int _currentIndex = 0;
 
+  final Set<String> _knownTxIds = {};
+  bool _isFirstLoad = true;
+
   void _navigateToTransactions() {
     setState(() {
       _currentIndex = 1;
@@ -31,38 +34,49 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
     // Listen to real-time transactions stream for partner notifications
     ref.listen<List<TransactionItem>>(rawTransactionsProvider, (previous, next) {
-      if (previous != null && next.length > previous.length) {
-        // Find newly added transactions
-        final prevIds = previous.map((t) => t.id).toSet();
-        final newTxs = next.where((t) => !prevIds.contains(t.id)).toList();
+      if (_isFirstLoad) {
+        _knownTxIds.addAll(next.map((t) => t.id));
+        if (next.isNotEmpty) {
+          _isFirstLoad = false;
+        }
+        return;
+      }
 
-        for (var tx in newTxs) {
-          // If transaction was created by partner
-          if (tx.createdByUserId != null && tx.createdByUserId != currentUserId) {
-            final partnerName = tx.createdByName ?? 'แฟนของคุณ';
-            final typeText = tx.type == 'income' ? 'รายรับ' : 'รายจ่าย';
-            final amountText = CurrencyFormatter.format(tx.amount);
+      final prevIds = previous?.map((t) => t.id).toSet() ?? <String>{};
+      final newTxs = next.where((t) => !prevIds.contains(t.id) && !_knownTxIds.contains(t.id)).toList();
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Text('💕 ', style: TextStyle(fontSize: 16)),
-                    Expanded(
-                      child: Text(
-                        '[$partnerName] บันทึก$typeTextใหม่ $amountText ${tx.note != null ? "(${tx.note})" : ""}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
+      for (var tx in newTxs) {
+        _knownTxIds.add(tx.id);
+
+        // Only notify if the transaction is recent (created within the last 5 minutes)
+        final age = DateTime.now().difference(tx.createdAt).inMinutes.abs();
+        if (age > 5) continue;
+
+        // If transaction was created by partner
+        if (tx.createdByUserId != null && tx.createdByUserId != currentUserId) {
+          final partnerName = tx.createdByName ?? 'แฟนของคุณ';
+          final typeText = tx.type == 'income' ? 'รายรับ' : 'รายจ่าย';
+          final amountText = CurrencyFormatter.format(tx.amount);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Text('💕 ', style: TextStyle(fontSize: 16)),
+                  Expanded(
+                    child: Text(
+                      '[$partnerName] บันทึก$typeTextใหม่ $amountText ${tx.note != null ? "(${tx.note})" : ""}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                  ],
-                ),
-                backgroundColor: const Color(0xFFE91E63),
-                duration: const Duration(seconds: 4),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ],
               ),
-            );
-          }
+              backgroundColor: const Color(0xFFE91E63),
+              duration: const Duration(seconds: 4),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
         }
       }
     });

@@ -460,168 +460,192 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const SizedBox(height: 16),
 
                 // Center: Duo Avatars & Love Heart Bridge
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                Stack(
+                  alignment: Alignment.center,
                   children: [
-                    // User 1: Me
-                    Expanded(
-                      child: Column(
-                        children: [
-                          GestureDetector(
-                            onTap: () => _pickProfileImage(userProfile?.nickname ?? '', userProfile, userId),
-                            child: Stack(
-                              alignment: Alignment.bottomRight,
-                              children: [
-                                CircleAvatar(
-                                  radius: 34,
-                                  backgroundColor: AppColors.primary.withOpacity(0.15),
-                                  backgroundImage: profileImageBytes != null
-                                      ? MemoryImage(profileImageBytes)
-                                      : (photoUrl != null && photoUrl.startsWith('http')
-                                          ? NetworkImage(photoUrl) as ImageProvider
-                                          : null),
-                                  child: (profileImageBytes == null && (photoUrl == null || !photoUrl.startsWith('http')))
-                                      ? Text(
-                                          userProfile != null && userProfile.nickname.isNotEmpty ? userProfile.nickname.substring(0, 1) : '👤',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 24),
-                                        )
-                                      : null,
-                                ),
-                                CircleAvatar(
-                                  radius: 11,
-                                  backgroundColor: AppColors.primary,
-                                  child: const Icon(Icons.camera_alt, size: 11, color: Colors.white),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  userProfile?.nickname ?? 'ฉัน',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              IconButton(
-                                constraints: const BoxConstraints(),
-                                padding: const EdgeInsets.only(left: 4),
-                                icon: const Icon(Icons.edit, size: 14, color: Colors.grey),
-                                tooltip: 'แก้ไขชื่อ',
-                                onPressed: () => _editProfileDialog(userProfile, userId),
-                              ),
+                    // Background Line Bridge connecting avatars
+                    Positioned(
+                      left: 60,
+                      right: 60,
+                      top: 34, // Vertical center of the 68px tall avatars
+                      child: Container(
+                        height: 2,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary.withOpacity(0.4),
+                              Colors.purple.withOpacity(0.4),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text('ฉัน (บัญชีนี้)', style: TextStyle(fontSize: 9, color: AppColors.primary, fontWeight: FontWeight.bold)),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-
-                    // Heart & Connection indicator
-                    Column(
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.pink.withOpacity(0.2),
-                                blurRadius: 8,
-                                spreadRadius: 2,
+                        // User 1: Me
+                        Expanded(
+                          child: Column(
+                            children: [
+                              GestureDetector(
+                                onTap: () => _pickProfileImage(userProfile?.nickname ?? '', userProfile, userId),
+                                child: Stack(
+                                  alignment: Alignment.bottomRight,
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 34,
+                                      backgroundColor: AppColors.primary.withOpacity(0.15),
+                                      backgroundImage: profileImageBytes != null
+                                          ? MemoryImage(profileImageBytes)
+                                          : (photoUrl != null && photoUrl.startsWith('http')
+                                              ? NetworkImage(photoUrl) as ImageProvider
+                                              : null),
+                                      child: (profileImageBytes == null && (photoUrl == null || !photoUrl.startsWith('http')))
+                                          ? Text(
+                                              userProfile != null && userProfile.nickname.isNotEmpty ? userProfile.nickname.substring(0, 1) : '👤',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 24),
+                                            )
+                                          : null,
+                                    ),
+                                    CircleAvatar(
+                                      radius: 11,
+                                      backgroundColor: AppColors.primary,
+                                      child: const Icon(Icons.camera_alt, size: 11, color: Colors.white),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      userProfile?.nickname ?? 'ฉัน',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    constraints: const BoxConstraints(),
+                                    padding: const EdgeInsets.only(left: 4),
+                                    icon: const Icon(Icons.edit, size: 14, color: Colors.grey),
+                                    tooltip: 'แก้ไขชื่อ',
+                                    onPressed: () => _editProfileDialog(userProfile, userId),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text('ฉัน (บัญชีนี้)', style: TextStyle(fontSize: 9, color: AppColors.primary, fontWeight: FontWeight.bold)),
                               ),
                             ],
                           ),
-                          child: const Text('💖', style: TextStyle(fontSize: 22)),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          coupleRoomAsync.value?.isFull == true ? 'เชื่อมต่อแล้ว' : 'รอคู่รัก',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: coupleRoomAsync.value?.isFull == true ? Colors.green.shade700 : Colors.amber.shade800,
+
+                        // Heart & Connection indicator
+                        Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.pink.withOpacity(0.2),
+                                    blurRadius: 8,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: const Text('💖', style: TextStyle(fontSize: 22)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              coupleRoomAsync.value?.isFull == true ? 'เชื่อมต่อแล้ว' : 'รอคู่รัก',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: coupleRoomAsync.value?.isFull == true ? Colors.green.shade700 : Colors.amber.shade800,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        // User 2: Partner
+                        Expanded(
+                          child: Column(
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const CoupleSetupScreen()),
+                                  );
+                                },
+                                child: Stack(
+                                  alignment: Alignment.bottomRight,
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 34,
+                                      backgroundColor: Colors.purple.withOpacity(0.15),
+                                      backgroundImage: partnerImageBytes != null
+                                          ? MemoryImage(partnerImageBytes)
+                                          : (partnerPhotoUrl != null && partnerPhotoUrl.startsWith('http')
+                                              ? NetworkImage(partnerPhotoUrl) as ImageProvider
+                                              : null),
+                                      child: (partnerImageBytes == null && (partnerPhotoUrl == null || !partnerPhotoUrl.startsWith('http')))
+                                          ? Text(
+                                              partnerProfile != null && partnerProfile.nickname.isNotEmpty
+                                                  ? partnerProfile.nickname.substring(0, 1)
+                                                  : (coupleRoomAsync.value?.isFull == true ? 'แฟน' : '➕'),
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.purple.shade700,
+                                                fontSize: 22,
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                    if (coupleRoomAsync.value?.isFull == true)
+                                      CircleAvatar(
+                                        radius: 11,
+                                        backgroundColor: Colors.green.shade600,
+                                        child: const Icon(Icons.favorite, size: 11, color: Colors.white),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                partnerProfile?.nickname ?? (coupleRoomAsync.value?.isFull == true ? 'แฟนของคุณ' : 'ยังไม่มีคู่รัก'),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  partnerProfile != null
+                                      ? 'แฟน 💕'
+                                      : (coupleRoomAsync.value?.isFull == true ? 'แฟน 💕' : 'กดเพื่อเชิญแฟน'),
+                                  style: TextStyle(fontSize: 9, color: Colors.purple.shade700, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
-                    ),
-
-                    // User 2: Partner
-                    Expanded(
-                      child: Column(
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const CoupleSetupScreen()),
-                              );
-                            },
-                            child: Stack(
-                              alignment: Alignment.bottomRight,
-                              children: [
-                                CircleAvatar(
-                                  radius: 34,
-                                  backgroundColor: Colors.purple.withOpacity(0.15),
-                                  backgroundImage: partnerImageBytes != null
-                                      ? MemoryImage(partnerImageBytes)
-                                      : (partnerPhotoUrl != null && partnerPhotoUrl.startsWith('http')
-                                          ? NetworkImage(partnerPhotoUrl) as ImageProvider
-                                          : null),
-                                  child: (partnerImageBytes == null && (partnerPhotoUrl == null || !partnerPhotoUrl.startsWith('http')))
-                                      ? Text(
-                                          partnerProfile != null && partnerProfile.nickname.isNotEmpty
-                                              ? partnerProfile.nickname.substring(0, 1)
-                                              : (coupleRoomAsync.value?.isFull == true ? 'แฟน' : '➕'),
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.purple.shade700,
-                                            fontSize: 22,
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                                if (coupleRoomAsync.value?.isFull == true)
-                                  CircleAvatar(
-                                    radius: 11,
-                                    backgroundColor: Colors.green.shade600,
-                                    child: const Icon(Icons.favorite, size: 11, color: Colors.white),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            partnerProfile?.nickname ?? (coupleRoomAsync.value?.isFull == true ? 'แฟนของคุณ' : 'ยังไม่มีคู่รัก'),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.purple.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              partnerProfile != null ? 'แฟน 💕' : 'กดเพื่อเชิญแฟน',
-                              style: TextStyle(fontSize: 9, color: Colors.purple.shade700, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                   ],
                 ),

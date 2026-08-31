@@ -105,6 +105,7 @@ class _WalletManagementScreenState extends ConsumerState<WalletManagementScreen>
             ElevatedButton(
               onPressed: () {
                 if (_nameController.text.trim().isNotEmpty) {
+                  final walletList = ref.read(walletsProvider);
                   final wallet = Wallet(
                     id: existing?.id ?? 'wallet_${const Uuid().v4()}',
                     name: _nameController.text.trim(),
@@ -112,6 +113,7 @@ class _WalletManagementScreenState extends ConsumerState<WalletManagementScreen>
                     icon: _selectedIcon,
                     startingBalance: double.tryParse(_balanceController.text) ?? 0.0,
                     currentBalance: existing?.currentBalance ?? (double.tryParse(_balanceController.text) ?? 0.0),
+                    order: existing?.order ?? walletList.length,
                     createdAt: existing?.createdAt ?? DateTime.now(),
                   );
                   if (existing == null) {
@@ -167,14 +169,24 @@ class _WalletManagementScreenState extends ConsumerState<WalletManagementScreen>
       ),
       body: wallets.isEmpty
           ? const Center(child: Text('ไม่มีกระเป๋าเงิน กดปุ่ม + เพื่อเพิ่ม'))
-          : ListView.builder(
+          : ReorderableListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: wallets.length,
+              onReorder: (oldIndex, newIndex) {
+                if (oldIndex < newIndex) {
+                  newIndex -= 1;
+                }
+                final List<Wallet> reorderedList = List<Wallet>.from(wallets);
+                final item = reorderedList.removeAt(oldIndex);
+                reorderedList.insert(newIndex, item);
+                ref.read(rawWalletsProvider.notifier).reorderWallets(reorderedList);
+              },
               itemBuilder: (context, index) {
                 final wallet = wallets[index];
                 final wColor = AppColors.fromHex(wallet.color);
 
                 return Card(
+                  key: ValueKey(wallet.id),
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: wColor.withOpacity(0.12),
@@ -206,6 +218,8 @@ class _WalletManagementScreenState extends ConsumerState<WalletManagementScreen>
                           icon: const Icon(Icons.delete, color: AppColors.expense, size: 20),
                           onPressed: () => _confirmDeleteWallet(wallet),
                         ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.drag_handle, color: Colors.grey),
                       ],
                     ),
                   ),

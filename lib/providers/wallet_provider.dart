@@ -1,4 +1,4 @@
-﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_provider.dart';
 import 'couple_provider.dart';
 import 'transaction_provider.dart';
@@ -26,7 +26,7 @@ final walletsProvider = Provider<List<Wallet>>((ref) {
   final rawWallets = ref.watch(rawWalletsProvider);
   final transactions = ref.watch(rawTransactionsProvider);
 
-  return rawWallets.map((wallet) {
+  final list = rawWallets.map((wallet) {
     double balance = wallet.startingBalance;
     final walletTransactions = transactions.where((tx) => tx.walletId == wallet.id);
     for (var tx in walletTransactions) {
@@ -38,6 +38,13 @@ final walletsProvider = Provider<List<Wallet>>((ref) {
     }
     return wallet.copyWith(currentBalance: balance);
   }).toList();
+
+  list.sort((a, b) {
+    final cmp = a.order.compareTo(b.order);
+    if (cmp != 0) return cmp;
+    return a.createdAt.compareTo(b.createdAt);
+  });
+  return list;
 });
 
 class RawWalletsNotifier extends StateNotifier<List<Wallet>> {
@@ -72,6 +79,15 @@ class RawWalletsNotifier extends StateNotifier<List<Wallet>> {
     if (_roomId == null) return;
     await _repository.deleteWallet(_roomId, walletId);
     await loadWallets();
+  }
+
+  Future<void> reorderWallets(List<Wallet> reordered) async {
+    if (_roomId == null) return;
+    state = reordered;
+    for (int i = 0; i < reordered.length; i++) {
+      final updated = reordered[i].copyWith(order: i);
+      await _repository.saveWallet(_roomId, updated);
+    }
   }
 
   Future<void> resetToDefault() async {

@@ -294,6 +294,7 @@ class _GuidedOnboardingScreenState extends ConsumerState<GuidedOnboardingScreen>
             ElevatedButton(
               onPressed: () {
                 if (_customNameController.text.trim().isNotEmpty) {
+                  final onboardingState = ref.read(onboardingFlowProvider);
                   final newWallet = Wallet(
                     id: 'custom_wallet_${const Uuid().v4()}',
                     name: _customNameController.text.trim(),
@@ -301,6 +302,7 @@ class _GuidedOnboardingScreenState extends ConsumerState<GuidedOnboardingScreen>
                     icon: selectedIcon,
                     startingBalance: 0.0,
                     currentBalance: 0.0,
+                    order: onboardingState.selectedWallets.length,
                     createdAt: DateTime.now(),
                   );
                   ref.read(onboardingFlowProvider.notifier).addCustomWallet(newWallet);

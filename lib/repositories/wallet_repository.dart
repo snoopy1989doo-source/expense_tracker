@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/wallet.dart';
@@ -92,6 +92,7 @@ class FirestoreWalletRepository implements WalletRepository {
 
   @override
   Future<void> seedDefaultWallets(String roomId) async {
+    int currentOrder = 0;
     for (var wData in DefaultCategoriesData.defaultWallets) {
       final wallet = Wallet(
         id: wData['id'],
@@ -100,6 +101,7 @@ class FirestoreWalletRepository implements WalletRepository {
         icon: wData['icon'],
         startingBalance: wData['startingBalance'],
         currentBalance: wData['startingBalance'],
+        order: currentOrder++,
         createdAt: DateTime.now(),
       );
       await saveWallet(roomId, wallet);
@@ -119,7 +121,11 @@ class FirestoreWalletRepository implements WalletRepository {
     return decoded
         .map((item) => Wallet.fromMap(item as Map<String, dynamic>, item['id'] ?? ''))
         .toList()
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      ..sort((a, b) {
+        final cmp = a.order.compareTo(b.order);
+        if (cmp != 0) return cmp;
+        return a.createdAt.compareTo(b.createdAt);
+      });
   }
 
   Future<void> _saveLocalWallet(String roomId, Wallet wallet) async {

@@ -96,14 +96,50 @@ class TransactionItem {
     };
   }
 
+  Map<String, dynamic> toLocalMap() {
+    return {
+      'id': id,
+      'type': type,
+      'amount': amount,
+      'date': date.toIso8601String(),
+      'mainCategoryId': mainCategoryId,
+      'subCategoryId': subCategoryId,
+      'walletId': walletId,
+      'note': note,
+      'loveNote': loveNote,
+      'receiptImageUrl': receiptImageUrl,
+      'isTaxDeductible': isTaxDeductible,
+      'createdByUserId': createdByUserId,
+      'createdByName': createdByName,
+      'createdByPhoto': createdByPhoto,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+    };
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+    if (value is Timestamp) return value.toDate();
+    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+    if (value is String) {
+      final parsed = DateTime.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+    if (value is Map) {
+      final seconds = value['_seconds'] ?? value['seconds'] ?? value['secondsSinceEpoch'];
+      if (seconds != null) {
+        return DateTime.fromMillisecondsSinceEpoch((seconds as num).toInt() * 1000);
+      }
+    }
+    return DateTime.now();
+  }
+
   factory TransactionItem.fromMap(Map<String, dynamic> map, String docId) {
     return TransactionItem(
       id: docId,
       type: map['type'] ?? 'expense',
       amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
-      date: map['date'] != null
-          ? (map['date'] as Timestamp).toDate()
-          : DateTime.now(),
+      date: _parseDateTime(map['date']),
       mainCategoryId: map['mainCategoryId'] ?? '',
       subCategoryId: map['subCategoryId'] ?? '',
       walletId: map['walletId'] ?? '',
@@ -114,12 +150,8 @@ class TransactionItem {
       createdByUserId: map['createdByUserId'] as String?,
       createdByName: map['createdByName'] as String?,
       createdByPhoto: map['createdByPhoto'] as String?,
-      createdAt: map['createdAt'] != null
-          ? (map['createdAt'] as Timestamp).toDate()
-          : DateTime.now(),
-      updatedAt: map['updatedAt'] != null
-          ? (map['updatedAt'] as Timestamp).toDate()
-          : DateTime.now(),
+      createdAt: _parseDateTime(map['createdAt']),
+      updatedAt: _parseDateTime(map['updatedAt']),
     );
   }
 }

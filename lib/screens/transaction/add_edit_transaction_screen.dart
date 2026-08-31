@@ -906,9 +906,12 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       } else {
         return !cat.id.contains('income') && !cat.name.contains('รายรับ');
       }
-    }).toList();
+    }).toList()..sort((a, b) => a.order.compareTo(b.order));
 
-    final filteredSubCats = subCats.where((sub) => sub.mainCategoryId == _selectedMainCategoryId).toList();
+    final filteredSubCats = subCats
+        .where((sub) => sub.mainCategoryId == _selectedMainCategoryId)
+        .toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
 
     return Scaffold(
       appBar: AppBar(

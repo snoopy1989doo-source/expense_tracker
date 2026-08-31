@@ -1,4 +1,4 @@
-﻿import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -182,12 +182,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _repository.loginAsGuest();
       final uid = _repository.currentUserId;
       if (uid != null) {
+        // Ensure guest has a profile doc for syncing
+        final existing = await _profileRepo.getUserProfile(uid);
+        if (existing == null) {
+          final profile = UserProfile(
+            id: uid,
+            email: 'guest_$uid@kapookluxx.com',
+            nickname: 'ต๋อง/ฝน (เกสต์)',
+            photoBase64: null,
+            coupleRoomId: null,
+            createdAt: DateTime.now(),
+          );
+          await _profileRepo.saveProfile(profile);
+        }
         state = AuthState.authenticated(uid);
       } else {
         state = AuthState.error('ไม่สามารถเข้าสู่ระบบแบบเกสต์ได้');
       }
     } catch (e) {
-      state = AuthState.error('เกิดข้อผิดพลาดในการเข้าสู่ระบบแบบเกสต์');
+      state = AuthState.error('เกิดข้อผิดพลาดในการเข้าสู่ระบบแบบเกสต์: $e');
     }
   }
 
