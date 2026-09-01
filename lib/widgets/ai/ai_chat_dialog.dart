@@ -198,9 +198,24 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
     );
   }
 
+  final ScrollController _scrollController = ScrollController();
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
   @override
   void dispose() {
     _textController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -214,6 +229,7 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
       _messages.add({'sender': 'user', 'text': userMsg});
       _isLoading = true;
     });
+    _scrollToBottom();
 
     final transactions = ref.read(rawTransactionsProvider);
     final categories = ref.read(mainCategoriesProvider);
@@ -239,6 +255,7 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
         _isLoading = false;
         _messages.add({'sender': 'ai', 'text': aiReply});
       });
+      _scrollToBottom();
     }
   }
 
@@ -346,6 +363,7 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
           // Messages List
           Expanded(
             child: ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               itemCount: _messages.length + (_isLoading ? 1 : 0),
               itemBuilder: (context, index) {
