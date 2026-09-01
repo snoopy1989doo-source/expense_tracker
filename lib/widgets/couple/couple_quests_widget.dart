@@ -316,13 +316,85 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
 
   int _extraFortuneOffset = 0;
 
-  void _openWebUrl(String url) {
-    if (kIsWeb) {
-      try {
-        js_util.callMethod(js_util.globalThis, 'open', [url, '_blank']);
-      } catch (_) {}
-    }
-  }
+  static const Map<int, Map<String, dynamic>> _weeklyHoroscopeData = {
+    1: {
+      'dayName': 'วันจันทร์',
+      'capricornFinance': 'การเงินเริ่มสัปดาห์ด้วยความมั่นคง มีเกณฑ์ได้รับผลตอบแทนหรือข่าวดีเรื่องเงินที่รอคอย ระวังอย่าเพิ่งใจร้อนซื้อของผ่อนระยะยาว',
+      'capricornCareer': 'งานราบรื่น มีผู้ใหญ่หรือเพื่อนร่วมงานคอยสนับสนุน งานระบบหรือการวางแผนจะสำเร็จลุล่วงได้ไว',
+      'capricornLove': 'ความรักอบอุ่น เข้าใจกันดี ชวนกันวางแผนเป้าหมายสัปดาห์นี้จะช่วยเพิ่มความสุข',
+      'capricornCaution': 'ระวังอาการเมื่อยล้าคอบ่าไหล่จากการทำงาน พักสายตาเป็นระยะ',
+      'tongFriday': 'ต๋อง (วันศุกร์): ดาวศุกร์ส่งพลังให้งานไหลลื่น มีสมาธิสูง ควบคุมการใช้จ่ายได้ดีตามเป้า',
+      'fonWednesday': 'ฝน (วันพุธ): ดาวพุธเด่นเรื่องเจรจาค้าขาย ลูกค้าหรือเพื่อนร่วมงานให้ความร่วมมือดีเยี่ยม',
+      'luckyDirection': 'ทิศตะวันออกเฉียงเหนือ 🧭',
+      'luckyTime': '09:19 - 10:45 น. ⏰',
+    },
+    2: {
+      'dayName': 'วันอังคาร',
+      'capricornFinance': 'การเงินหมุนเวียนคล่องตัว มีช่องทางประหยัดค่าใช้จ่ายในบ้านได้เยอะ ระวังรายจ่ายจากของกินเล่นหรือชานมช่วงบ่าย',
+      'capricornCareer': 'มีความคล่องแคล่วในการแก้ปัญหาเฉพาะหน้า งานช่างหรืองานเทคนิคผ่านฉลุย ไร้อุปสรรคขัดขวาง',
+      'capricornLove': 'ความรักมีชีวิตชีวา เติมความหวานด้วยมื้อเย็นอร่อยๆ หรือของฝากเล็กๆ น้อยๆ ให้กัน',
+      'capricornCaution': 'ระวังความรีบร้อนในการเดินทาง ขับรถใจเย็นๆ ปลอดภัยไว้ก่อน',
+      'tongFriday': 'ต๋อง (วันศุกร์): พลังงานในการทำงานเต็มเปี่ยม วางแผนเรื่องเงินเก็บได้รอบคอบ',
+      'fonWednesday': 'ฝน (วันพุธ): วาจาเป็นเลิศ มีโอกาสได้ดีลราคาพิเศษหรือเจอของเซลล์ที่คุ้มค่าจริงๆ',
+      'luckyDirection': 'ทิศเหนือ 🧭',
+      'luckyTime': '13:30 - 15:00 น. ⏰',
+    },
+    3: {
+      'dayName': 'วันพุธ',
+      'capricornFinance': 'ดวงการเงินเปิดรับทรัพย์ มีเกณฑ์ได้เงินคืนหรือได้โชคลาภเล็กๆ น้อยๆ เหมาะแก่การหยอดกระปุกออมสินคู่',
+      'capricornCareer': 'การติดต่อสื่อสารและการส่งต่องานราบรื่น ไร้ข้อผิดพลาด ได้รับคำชื่นชมจากผลงาน',
+      'capricornLove': 'คู่รักหนุนดวงการเงิน ให้กำลังใจซึ่งกันและกันอย่างดี ยิ่งคุยกันเรื่องอนาคตยิ่งมั่นคง',
+      'capricornCaution': 'ระวังดื่มน้ำน้อยจนรู้สึกเพลียช่วงบ่าย จิบน้ำบ่อยๆ',
+      'tongFriday': 'ต๋อง (วันศุกร์): งานระบบไฟฟ้าและเครื่องมือตรวจเช็กได้แม่นยำ งานสำเร็จตามกำหนด',
+      'fonWednesday': 'ฝน (วันพุธ): วันตรงเกิดดาวพุธเปล่งประกาย การงานการเงินคล่องตัวเป็นพิเศษ มีเสน่ห์เมตตามหานิยม',
+      'luckyDirection': 'ทิศใต้ 🧭',
+      'luckyTime': '10:09 - 11:30 น. ⏰',
+    },
+    4: {
+      'dayName': 'วันพฤหัสบดี',
+      'capricornFinance': 'การเงินนิ่งสงบ มั่นคงสูง ควบคุมงบประมาณได้ดีเยี่ยม เหมาะแก่การตรวจสอบยอดเงินคงเหลือในกระเป๋า',
+      'capricornCareer': 'สติปัญญาเฉียบแหลม แก้ไขงานยากได้ง่ายดาย มีเกณฑ์ได้รับมอบหมายงานสำคัญที่สร้างผลงาน',
+      'capricornLove': 'ความสัมพันธ์ราบเรียบแต่มั่นคง เป็นที่พึ่งทางใจให้กันและกันได้อย่างดีเลิศ',
+      'capricornCaution': 'อย่ายกของหนักเกินกำลัง ระวังอาการปวดหลัง',
+      'tongFriday': 'ต๋อง (วันศุกร์): งานราบรื่น ไร้แรงกดดัน มีเวลาคิดแผนพัฒนาตนเองและเป้าหมายคู่รัก',
+      'fonWednesday': 'ฝน (วันพุธ): จัดการภาระงานได้เป็นระเบียบเรียบร้อย เคลียร์งานค้างได้หมดจด',
+      'luckyDirection': 'ทิศตะวันออก 🧭',
+      'luckyTime': '14:15 - 16:00 น. ⏰',
+    },
+    5: {
+      'dayName': 'วันศุกร์',
+      'capricornFinance': 'การเงินคึกคักต้อนรับสุดสัปดาห์ มีเกณฑ์รายรับพิเศษหรือเงินโบนัสเล็กๆ แต่ระวังค่าใช้จ่ายปาร์ตี้/มื้อพิเศษ',
+      'capricornCareer': 'บรรยากาศการทำงานผ่อนคลาย ปิดจ็อบสัปดาห์ได้สวยงาม ไม่มีงานค้างคาใจ',
+      'capricornLove': 'ความรักหวานฉ่ำสุดๆ เหมาะกับการไปเดท กินของอร่อย หรือพักผ่อนดูหนังด้วยกันที่บ้าน',
+      'capricornCaution': 'ระวังทานอาหารรสจัดหรือมื้อดึกเกินไป รักษาสุขภาพกระเพาะอาหาร',
+      'tongFriday': 'ต๋อง (วันศุกร์): วันตรงเกิดดาวศุกร์หนุนดวงมหาเสน่ห์และโชคลาภ การเงินปังและมีความสุขมาก',
+      'fonWednesday': 'ฝน (วันพุธ): อารมณ์แจ่มใส ช้อปปิ้งได้ของคุ้มค่า แฟนดูแลเอาใจใส่เป็นพิเศษ',
+      'luckyDirection': 'ทิศตะวันออกเฉียงใต้ 🧭',
+      'luckyTime': '16:00 - 18:00 น. ⏰',
+    },
+    6: {
+      'dayName': 'วันเสาร์',
+      'capricornFinance': 'วันดีแห่งการวางแผนการเงินครอบครัว จัดสรรเงินออม ซื้อของเข้าบ้านในราคาคุ้มค่า',
+      'capricornCareer': 'ดาวเสาร์ประจำราศีมังกรส่งเสริมความอดทนและสมาธิ หากทำงานเสริมจะสร้างรายได้งอกเงย',
+      'capricornLove': 'ความรักอบอุ่น ได้ใช้เวลาคุณภาพร่วมกัน ช่วยกันดูแลบ้านและสัตว์เลี้ยง (กังฟู & โอเลี้ยง 🐱)',
+      'capricornCaution': 'ระวังนอนดึกเกินไป พักผ่อนให้เต็มอิ่มเพื่อฟื้นฟูพลังงาน',
+      'tongFriday': 'ต๋อง (วันศุกร์): พักผ่อนสบายใจ ได้ทำสิ่งที่ชอบ ซ่อมแซมหรือจัดระเบียบของใช้ได้ลงตัว',
+      'fonWednesday': 'ฝน (วันพุธ): มีความสุขกับการพักผ่อนและการทำอาหาร/กินของอร่อยกับคนรัก',
+      'luckyDirection': 'ทิศตะวันตกเฉียงใต้ 🧭',
+      'luckyTime': '11:11 - 12:30 น. ⏰',
+    },
+    7: {
+      'dayName': 'วันอาทิตย์',
+      'capricornFinance': 'ดวงการเงินสดใส ได้รับความสุขจากการใช้จ่ายที่คุ้มค่า เตรียมพร้อมงบประมาณสำหรับสัปดาห์ใหม่',
+      'capricornCareer': 'จิตใจปลอดโปร่ง มีไอเดียใหม่ๆ ในการทำงานและสร้างความมั่นคงในอนาคต',
+      'capricornLove': 'ความสัมพันธ์แน่นแฟ้น ให้กำลังใจกันพร้อมลุยงานวันพรุ่งนี้ พลังความรักเต็ม 100%',
+      'capricornCaution': 'เตรียมตัวล่วงหน้าก่อนนอนเพื่อไม่ให้เช้าวันจันทร์รีบร้อน',
+      'tongFriday': 'ต๋อง (วันศุกร์): ชาร์จพลังเต็มร้อย พร้อมเป็นผู้นำและดูแลแฟนอย่างอบอุ่น',
+      'fonWednesday': 'ฝน (วันพุธ): หัวใจเบิกบาน ได้รับการซัพพอร์ตที่ดีจากต๋องเสมอ',
+      'luckyDirection': 'ทิศตะวันตก 🧭',
+      'luckyTime': '08:30 - 10:00 น. ⏰',
+    },
+  };
 
   void _showFortuneDetailsDialog({
     required String dayName,
@@ -339,6 +411,8 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
         builder: (context, setDialogState) {
           final stars = (moneyScore / 20).clamp(1, 5).toInt();
           final isWarningDay = moneyScore < 70;
+          final weekday = DateTime.now().weekday;
+          final hData = _weeklyHoroscopeData[weekday] ?? _weeklyHoroscopeData[1]!;
 
           return AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -367,6 +441,7 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Star Rating
                   Row(
@@ -439,15 +514,129 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 14),
+
+                  // In-depth Horoscope Predictions Header
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.deepPurple.shade100, width: 1.2),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.deepPurple.shade50,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.auto_awesome, size: 16, color: Colors.deepPurple),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              '📖 คำทำนายดวงชะตารายวัน (ราศีมังกร ♑)',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.deepPurple),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 16),
+                        
+                        // 1. Finance
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('💰 ', style: TextStyle(fontSize: 13)),
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  style: TextStyle(fontSize: 12, height: 1.4, color: Theme.of(context).textTheme.bodyMedium?.color),
+                                  children: [
+                                    const TextSpan(text: 'การเงิน & โชคลาภ: ', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.income)),
+                                    TextSpan(text: hData['capricornFinance'] as String),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // 2. Career
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('💼 ', style: TextStyle(fontSize: 13)),
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  style: TextStyle(fontSize: 12, height: 1.4, color: Theme.of(context).textTheme.bodyMedium?.color),
+                                  children: [
+                                    const TextSpan(text: 'การงาน & กิจการ: ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                                    TextSpan(text: hData['capricornCareer'] as String),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // 3. Love
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('💖 ', style: TextStyle(fontSize: 13)),
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  style: TextStyle(fontSize: 12, height: 1.4, color: Theme.of(context).textTheme.bodyMedium?.color),
+                                  children: [
+                                    const TextSpan(text: 'ความรัก & ความสุขคู่เรา: ', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                    TextSpan(text: hData['capricornLove'] as String),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // 4. Caution / Health
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('🛡️ ', style: TextStyle(fontSize: 13)),
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  style: TextStyle(fontSize: 12, height: 1.4, color: Theme.of(context).textTheme.bodyMedium?.color),
+                                  children: [
+                                    const TextSpan(text: 'สุขภาพ & ข้อควรระวัง: ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange)),
+                                    TextSpan(text: hData['capricornCaution'] as String),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 12),
 
-                  // Birthdate & Couple Zodiac Analysis Box
+                  // Birthdate Personalized Deep-Dive Box
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.pink.shade50.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: Colors.pink.shade200),
                     ),
                     child: Column(
@@ -455,91 +644,90 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.auto_awesome, size: 14, color: AppColors.primary),
+                            Icon(Icons.favorite, size: 14, color: AppColors.primary),
                             SizedBox(width: 6),
-                            Text('ดวงคู่รักตามวันเกิด (ต๋อง ♑ & ฝน ♑)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primary)),
+                            Text('ดวงเจาะลึกเฉพาะบุคคล (ต๋อง ♑ & ฝน ♑)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primary)),
                           ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '• ${hData['tongFriday']}',
+                          style: const TextStyle(fontSize: 11.5, height: 1.4, color: Colors.black87),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '• ${hData['fonWednesday']}',
+                          style: const TextStyle(fontSize: 11.5, height: 1.4, color: Colors.black87),
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          '• ต๋อง (17 ม.ค. ราศีมังกร/วันศุกร์): ดาวศุกร์หนุนนำความมั่งคั่งจากงานหลัก ระวังรายจ่ายเกี่ยวกับอุปกรณ์/รถยนต์\n• ฝน (15 ม.ค. ราศีมังกร/วันพุธ): ดาวพุธเด่นเจรจาค้าขายคล่อง ช้อปออนไลน์แนะนำคุยกับแฟนก่อนกดสั่ง\n• พลังมังกรคู่รักธาตุดิน: หนุนดวงการเก็บเงินสร้างอนาคตร่วมกันได้มั่นคงเป็นพิเศษ!',
-                          style: TextStyle(fontSize: 11, height: 1.45, color: Colors.black87),
+                          '• พลังมังกรคู่ธาตุดิน (คบกัน 17 ม.ค. 2566): หนุนดวงการเก็บเงินสร้างอนาคตร่วมกันได้มั่นคงเป็นพิเศษ!',
+                          style: TextStyle(fontSize: 11.5, height: 1.4, fontWeight: FontWeight.w600, color: Colors.deepPurple),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 12),
 
-                  // Lucky Elements
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                          ),
-                          child: Column(
-                            children: [
-                              const Text('🎨 สีมงคลวันนี้', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                              const SizedBox(height: 2),
-                              Text(luckyColor, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11), textAlign: TextAlign.center),
-                            ],
-                          ),
+                  // Lucky Elements Grid (4 Items: Color, Number, Direction, Time)
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  const Text('🎨 สีมงคลวันนี้', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                  const SizedBox(height: 2),
+                                  Text(luckyColor, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11), textAlign: TextAlign.center),
+                                ],
+                              ),
+                            ),
+                            Container(width: 1, height: 28, color: Theme.of(context).colorScheme.outlineVariant),
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  const Text('🔢 เลขนำโชค', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                  const SizedBox(height: 2),
+                                  Text(luckyNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary)),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                          ),
-                          child: Column(
-                            children: [
-                              const Text('🔢 เลขนำโชค', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                              const SizedBox(height: 2),
-                              Text(luckyNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary)),
-                            ],
-                          ),
+                        const Divider(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  const Text('🧭 ทิศมงคล', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                  const SizedBox(height: 2),
+                                  Text(hData['luckyDirection'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10.5), textAlign: TextAlign.center),
+                                ],
+                              ),
+                            ),
+                            Container(width: 1, height: 28, color: Theme.of(context).colorScheme.outlineVariant),
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  const Text('⏰ ฤกษ์เวลานำโชค', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                  const SizedBox(height: 2),
+                                  Text(hData['luckyTime'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10.5, color: Colors.teal), textAlign: TextAlign.center),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // External Daily Horoscope Links
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('🌐 ลิงก์ดูดวงรายวันสดใหม่ (อัปเดตทุกวัน):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          ActionChip(
-                            avatar: const Text('🌟', style: TextStyle(fontSize: 12)),
-                            label: const Text('Sanook ดูดวง', style: TextStyle(fontSize: 11)),
-                            onPressed: () => _openWebUrl('https://www.sanook.com/horoscope/'),
-                          ),
-                          ActionChip(
-                            avatar: const Text('🔮', style: TextStyle(fontSize: 12)),
-                            label: const Text('ไทยรัฐ ดวงรายวัน', style: TextStyle(fontSize: 11)),
-                            onPressed: () => _openWebUrl('https://www.thairath.co.th/horoscope/daily'),
-                          ),
-                          ActionChip(
-                            avatar: const Text('🥠', style: TextStyle(fontSize: 12)),
-                            label: const Text('MyHora ดูดวง', style: TextStyle(fontSize: 11)),
-                            onPressed: () => _openWebUrl('https://www.myhora.com/'),
-                          ),
-                        ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
