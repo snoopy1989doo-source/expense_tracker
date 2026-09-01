@@ -188,12 +188,12 @@ class AIFinanceService {
     final topSubList = subExpense.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     final topSubSummary = topSubList.take(5).map((e) => '${e.key}: ${CurrencyFormatter.format(e.value)}').join(', ');
 
-    // System prompt with full family & financial context
-    final promptWithContext = '''
-[คำสั่งระบบ: คุณคือ "AI ที่ปรึกษาการเงินและผู้ช่วยชีวิตคู่" ประจำแอป Kapookluxx ตอบคำถามอย่างเป็นธรรมชาติ น่ารัก อบอุ่น และเป็นกันเอง ห้ามตอบเป็นสคริปต์แข็งๆ]
+    // System instruction with full family & financial context
+    final systemPrompt = '''
+คุณคือ "AI ที่ปรึกษาการเงินและผู้ช่วยชีวิตคู่" ประจำแอป Kapookluxx ตอบคำถามอย่างเป็นธรรมชาติ น่ารัก อบอุ่น และเป็นกันเอง
 
 ข้อมูลบริบทชีวิตคู่และครอบครัวจริง (Real Context):
-- ผู้ใช้: ต๋อง (อายุ 23 ปี, ทำงานเป็นช่างไฟฟ้าระบบ Utility ในโรงงาน ฐานเงินเดือน ~12,000-15,000 บาท)
+- ผู้ใช้: ต๋อง (อายุ 23 ปี, ช่างไฟฟ้าระบบ Utility ในโรงงาน ฐานเงินเดือน ~12,000-15,000 บาท)
 - แฟนสาว: ฝน (อายุ 23 ปี, เกิด 15 มกราคม 2546)
 - วันครบรอบเป็นแฟนกัน: 17 มกราคม 2566 (คบกันมาแล้ว $daysTogether วัน)
 - วันเกิดต๋อง: 17 มกราคม 2546 (วันเดียวกับวันครบรอบ)
@@ -210,13 +210,11 @@ class AIFinanceService {
 - คงเหลือสุทธิ: ${CurrencyFormatter.format(netBalance)}
 - รายการใช้จ่ายเด่น: $topSubSummary
 
-แนวทางการตอบ:
-- ตอบเป็นภาษาไทยอย่างอบอุ่น เป็นกันเอง สุภาพ น่ารัก สไตล์ที่ปรึกษาการเงินคู่รักตัวจริง (เรียกผู้ใช้ว่า "ต๋อง" และแฟนว่า "ฝน")
-- ตอบคำถามทุกหัวข้อ (ทั้งเรื่องของขวัญ, การเงิน, การวางแผนชีวิต, วันสำคัญ, กำลังใจ หรือเรื่องทั่วไป) อย่างมีชีวิตชีวาและสร้างสรรค์
-- ใช้ Emoji ประกอบน่ารักๆ จัดรูปแบบ Markdown ให้อ่านง่าย
-
-คำถามจากต๋อง:
-$query
+กติกาและแนวทางการตอบ:
+1. ตอบเป็นภาษาไทยอย่างอบอุ่น เป็นกันเอง สุภาพ น่ารัก เรียกผู้ใช้ว่า "ต๋อง" และแฟนว่า "ฝน"
+2. ตอบคำถามทุกหัวข้อ (ทั้งเรื่องของขวัญ, การเงิน, อากาศ/ชีวิตประจำวัน, การวางแผนชีวิต, วันสำคัญ, กำลังใจ หรือเรื่องทั่วไป) อย่างมีชีวิตชีวาและตรงประเด็น
+3. ตอบเฉพาะคำตอบสุดท้ายที่จะส่งให้ผู้ใช้ทันที ห้ามแสดงขั้นตอนการคิด (No internal drafting/thought process output)
+4. ใช้ Emoji ประกอบน่ารักๆ จัดรูปแบบ Markdown ให้อ่านง่าย
 ''';
 
     final models = [
@@ -236,17 +234,25 @@ $query
         );
 
         final requestBody = jsonEncode({
+          'systemInstruction': {
+            'parts': [
+              {'text': systemPrompt}
+            ]
+          },
           'contents': [
             {
               'role': 'user',
               'parts': [
-                {'text': promptWithContext}
+                {'text': query}
               ]
             }
           ],
           'generationConfig': {
-            'temperature': 0.8,
-            'maxOutputTokens': 1000,
+            'temperature': 0.7,
+            'maxOutputTokens': 2048,
+            'thinkingConfig': {
+              'thinkingBudget': 0,
+            },
           }
         });
 
@@ -256,7 +262,7 @@ $query
               headers: {'Content-Type': 'application/json'},
               body: requestBody,
             )
-            .timeout(const Duration(seconds: 10));
+            .timeout(const Duration(seconds: 12));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -265,6 +271,16 @@ $query
             final content = candidates[0]['content'];
             final parts = content['parts'] as List?;
             if (parts != null && parts.isNotEmpty) {
+              final textList = <String>[];
+              for (var p in parts) {
+                if (p is Map && p['thought'] != true && p['text'] != null) {
+                  textList.add(p['text'] as String);
+                }
+              }
+              if (textList.isNotEmpty) {
+                final full = textList.join('\n').trim();
+                if (full.isNotEmpty) return full;
+              }
               final text = parts[0]['text'] as String?;
               if (text != null && text.trim().isNotEmpty) {
                 return text.trim();
