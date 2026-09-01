@@ -9,6 +9,7 @@ class CoupleRoom {
   final Map<String, double> subcategoryBudgets; // {subCatId: monthlyBudgetAmount}
   final List<String> deletedDefaultFood;
   final List<String> deletedDefaultQuests;
+  final String? geminiApiKey;
 
   CoupleRoom({
     required this.id,
@@ -21,6 +22,7 @@ class CoupleRoom {
     this.subcategoryBudgets = const {},
     this.deletedDefaultFood = const [],
     this.deletedDefaultQuests = const [],
+    this.geminiApiKey,
   });
 
   bool get isFull => memberIds.length >= 2;
@@ -52,6 +54,7 @@ class CoupleRoom {
       subcategoryBudgets: budgets,
       deletedDefaultFood: List<String>.from(map['deletedDefaultFood'] as List? ?? []),
       deletedDefaultQuests: List<String>.from(map['deletedDefaultQuests'] as List? ?? []),
+      geminiApiKey: map['geminiApiKey'] as String?,
     );
   }
 
@@ -66,6 +69,7 @@ class CoupleRoom {
       'subcategoryBudgets': subcategoryBudgets,
       'deletedDefaultFood': deletedDefaultFood,
       'deletedDefaultQuests': deletedDefaultQuests,
+      if (geminiApiKey != null) 'geminiApiKey': geminiApiKey,
     };
   }
 }

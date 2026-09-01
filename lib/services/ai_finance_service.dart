@@ -43,42 +43,49 @@ class AIFinanceService {
     if (cleanKey.isEmpty) {
       return {'success': false, 'message': 'กรุณากรอก API Key ก่อนกดทดสอบครับ'};
     }
-    try {
-      final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$cleanKey',
-      );
-      final response = await http
-          .post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'contents': [
-                {
-                  'role': 'user',
-                  'parts': [
-                    {'text': 'ตอบสั้นๆ ว่าพร้อมใช้งาน'}
-                  ]
-                }
-              ]
-            }),
-          )
-          .timeout(const Duration(seconds: 8));
+    
+    final testModels = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+    String lastError = '';
 
-      if (response.statusCode == 200) {
-        return {'success': true, 'message': '✅ เชื่อมต่อ Google Gemini API สำเร็จสมบูรณ์! พร้อมใช้งาน'};
-      } else {
-        final bodyStr = utf8.decode(response.bodyBytes);
-        try {
-          final errJson = jsonDecode(bodyStr);
-          final msg = errJson['error']?['message'] ?? 'Status ${response.statusCode}';
-          return {'success': false, 'message': '❌ เชื่อมต่อไม่สำเร็จ (${response.statusCode}): $msg'};
-        } catch (_) {
-          return {'success': false, 'message': '❌ รหัส API Key ไม่ถูกต้อง (Status ${response.statusCode})'};
+    for (final model in testModels) {
+      try {
+        final url = Uri.parse(
+          'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$cleanKey',
+        );
+        final response = await http
+            .post(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'contents': [
+                  {
+                    'role': 'user',
+                    'parts': [
+                      {'text': 'ตอบสั้นๆ ว่าพร้อมใช้งาน'}
+                    ]
+                  }
+                ]
+              }),
+            )
+            .timeout(const Duration(seconds: 8));
+
+        if (response.statusCode == 200) {
+          return {'success': true, 'message': '✅ เชื่อมต่อ Google Gemini API สำเร็จสมบูรณ์! ($model) พร้อมใช้งาน'};
+        } else {
+          final bodyStr = utf8.decode(response.bodyBytes);
+          try {
+            final errJson = jsonDecode(bodyStr);
+            lastError = errJson['error']?['message'] ?? 'Status ${response.statusCode}';
+          } catch (_) {
+            lastError = 'Status ${response.statusCode}';
+          }
         }
+      } catch (e) {
+        lastError = e.toString();
       }
-    } catch (e) {
-      return {'success': false, 'message': '❌ ไม่สามารถติดต่อ Google API ได้: $e'};
     }
+
+    return {'success': false, 'message': '❌ เชื่อมต่อไม่สำเร็จ: $lastError'};
   }
 
   /// Asynchronous AI Finance Engine with Google Gemini LLM + Graceful Local Fallback
@@ -90,11 +97,17 @@ class AIFinanceService {
     required Map<String, double> subcategoryBudgets,
     required String? currentUserName,
     String? partnerName,
+    String? roomApiKey,
   }) async {
     // 1. Try Google Gemini API if configured
     try {
       final prefs = await SharedPreferences.getInstance();
-      final apiKey = prefs.getString('gemini_api_key') ?? '';
+      String apiKey = prefs.getString('gemini_api_key') ?? '';
+      if (apiKey.trim().isEmpty && roomApiKey != null && roomApiKey.trim().isNotEmpty) {
+        apiKey = roomApiKey.trim();
+        // Also cache locally on this device
+        await prefs.setString('gemini_api_key', apiKey);
+      }
 
       if (apiKey.trim().isNotEmpty) {
         final geminiReply = await _callGeminiApi(
@@ -198,7 +211,7 @@ class AIFinanceService {
 $query
 ''';
 
-    final models = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-flash-latest'];
+    final models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-1.5-pro'];
 
     for (final model in models) {
       try {

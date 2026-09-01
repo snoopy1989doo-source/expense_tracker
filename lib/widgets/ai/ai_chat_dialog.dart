@@ -44,10 +44,18 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
 
   Future<void> _checkApiKeyStatus() async {
     final prefs = await SharedPreferences.getInstance();
-    final key = prefs.getString('gemini_api_key') ?? '';
+    final localKey = prefs.getString('gemini_api_key') ?? '';
+    final coupleRoom = ref.read(coupleRoomProvider).value;
+    final roomKey = coupleRoom?.geminiApiKey ?? '';
+
+    final activeKey = localKey.trim().isNotEmpty ? localKey.trim() : roomKey.trim();
+    if (activeKey.isNotEmpty && localKey.trim().isEmpty) {
+      await prefs.setString('gemini_api_key', activeKey);
+    }
+
     if (mounted) {
       setState(() {
-        _hasGeminiKey = key.trim().isNotEmpty;
+        _hasGeminiKey = activeKey.isNotEmpty;
       });
     }
   }
@@ -58,7 +66,10 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
     bool isTesting = false;
 
     SharedPreferences.getInstance().then((prefs) {
-      keyController.text = prefs.getString('gemini_api_key') ?? '';
+      final localKey = prefs.getString('gemini_api_key') ?? '';
+      final coupleRoom = ref.read(coupleRoomProvider).value;
+      final roomKey = coupleRoom?.geminiApiKey ?? '';
+      keyController.text = localKey.isNotEmpty ? localKey : roomKey;
     });
 
     showDialog(
@@ -79,7 +90,7 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'ใส่ Google Gemini API Key เพื่อให้ AI คุยได้เป็นธรรมชาติ วางแผนชีวิตคู่ และตอบได้ทุกเรื่อง:',
+                  'ใส่ Google Gemini API Key เพื่อให้ AI คุยได้เป็นธรรมชาติ วางแผนชีวิตคู่ และตอบได้ทุกเรื่อง (ระบบจะซิงค์ให้อัตโนมัติทั้งในคอมและมือถือคู่รัก):',
                   style: TextStyle(fontSize: 12, height: 1.4),
                 ),
                 const SizedBox(height: 12),
@@ -146,6 +157,12 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
               onPressed: () async {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.remove('gemini_api_key');
+                final coupleRoomId = ref.read(coupleRoomIdProvider);
+                if (coupleRoomId != null && coupleRoomId.isNotEmpty && coupleRoomId != 'guest_user') {
+                  try {
+                    await ref.read(coupleRepositoryProvider).updateGeminiApiKey(coupleRoomId, '');
+                  } catch (_) {}
+                }
                 _checkApiKeyStatus();
                 if (ctx.mounted) Navigator.of(ctx).pop();
               },
@@ -156,12 +173,18 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
                 final key = AIFinanceService.sanitizeApiKey(keyController.text);
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('gemini_api_key', key);
+                final coupleRoomId = ref.read(coupleRoomIdProvider);
+                if (coupleRoomId != null && coupleRoomId.isNotEmpty && coupleRoomId != 'guest_user') {
+                  try {
+                    await ref.read(coupleRepositoryProvider).updateGeminiApiKey(coupleRoomId, key);
+                  } catch (_) {}
+                }
                 _checkApiKeyStatus();
                 if (ctx.mounted) {
                   Navigator.of(ctx).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(key.isNotEmpty ? '✨ บันทึก Gemini API Key เรียบร้อยแล้ว' : 'สลับเป็นโหมด Local Engine'),
+                      content: Text(key.isNotEmpty ? '✨ บันทึกและซิงค์ Gemini API Key ให้ทุกอุปกรณ์เรียบร้อยแล้ว' : 'สลับเป็นโหมด Local Engine'),
                     ),
                   );
                 }
@@ -198,6 +221,7 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
     final subcategoryBudgets = ref.read(subcategoryBudgetsProvider);
     final userProfile = ref.read(userProfileProvider).value;
     final partnerProfile = ref.read(partnerProfileProvider).value;
+    final coupleRoom = ref.read(coupleRoomProvider).value;
 
     final aiReply = await AIFinanceService.answerUserQueryAsync(
       query: userMsg,
@@ -207,6 +231,7 @@ class _AIChatDialogState extends ConsumerState<AIChatDialog> {
       subcategoryBudgets: subcategoryBudgets,
       currentUserName: userProfile?.nickname ?? 'ต๋อง',
       partnerName: partnerProfile?.nickname ?? 'ฝน',
+      roomApiKey: coupleRoom?.geminiApiKey,
     );
 
     if (mounted) {
