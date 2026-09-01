@@ -43,15 +43,16 @@ class AIFinanceService {
     if (cleanKey.isEmpty) {
       return {'success': false, 'message': 'กรุณากรอก API Key ก่อนกดทดสอบครับ'};
     }
-    if (!cleanKey.startsWith('AIzaSy')) {
-      final prefix = cleanKey.length > 6 ? cleanKey.substring(0, 6) : cleanKey;
-      return {
-        'success': false,
-        'message': '❌ รหัส API Key ไม่ถูกต้อง: API Key ของ Google Gemini จะต้องขึ้นต้นด้วย "AIzaSy..." เสมอครับ (คีย์ที่คุณใส่ขึ้นต้นด้วย "$prefix...")\n\n👉 วิธีกดรับคีย์ฟรีใน 1 นาที:\n1. เข้าเว็บ aistudio.google.com/app/apikey\n2. ล็อกอินบัญชี Google แล้วกด "Create API key"\n3. ก๊อปปี้คีย์ที่ขึ้นต้นด้วย AIzaSy... มาวาง'
-      };
-    }
     
-    final testModels = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+    final testModels = [
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.7-flash',
+      'gemini-3.6-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+    ];
     String lastError = '';
 
     for (final model in testModels) {
@@ -77,7 +78,7 @@ class AIFinanceService {
             .timeout(const Duration(seconds: 8));
 
         if (response.statusCode == 200) {
-          return {'success': true, 'message': '✅ เชื่อมต่อ Google Gemini API สำเร็จสมบูรณ์! ($model) พร้อมใช้งาน'};
+          return {'success': true, 'message': '✅ เชื่อมต่อ Google Gemini API สำเร็จสมบูรณ์! ($model) พร้อมใช้งาน ⚡'};
         } else {
           final bodyStr = utf8.decode(response.bodyBytes);
           try {
@@ -162,17 +163,6 @@ class AIFinanceService {
     final cleanKey = sanitizeApiKey(apiKey);
     if (cleanKey.isEmpty) return null;
 
-    if (!cleanKey.startsWith('AIzaSy')) {
-      final prefix = cleanKey.length > 6 ? cleanKey.substring(0, 6) : cleanKey;
-      return '⚠️ **Google Gemini แจ้งเตือน:**\n\n'
-          'รหัส API Key ที่คุณกรอกขึ้นต้นด้วย `$prefix...` ซึ่ง**ไม่ใช่**รูปแบบ Gemini API Key จาก Google AI Studio ครับ (คีย์จริงจะขึ้นต้นด้วย `AIzaSy...` เสมอ)\n\n'
-          '👉 **วิธีรับคีย์ฟรี 100% จาก Google ใน 1 นาที:**\n'
-          '1. กดที่ไอคอนกุญแจ 🔑 ด้านบนขวา\n'
-          '2. เข้าเว็บ [Google AI Studio](https://aistudio.google.com/app/apikey)\n'
-          '3. ล็อกอินบัญชี Google แล้วกด **"Create API key"**\n'
-          '4. ก๊อปปี้คีย์ที่ขึ้นต้นด้วย `AIzaSy...` มาใส่แล้วกดบันทึกครับ!';
-    }
-
     final now = DateTime.now();
     final currentMonthTxs = transactions.where((t) {
       return t.date.year == now.year && t.date.month == now.month;
@@ -222,14 +212,22 @@ class AIFinanceService {
 
 แนวทางการตอบ:
 - ตอบเป็นภาษาไทยอย่างอบอุ่น เป็นกันเอง สุภาพ น่ารัก สไตล์ที่ปรึกษาการเงินคู่รักตัวจริง (เรียกผู้ใช้ว่า "ต๋อง" และแฟนว่า "ฝน")
-- ตอบคำถามทุกหัวข้อ (ทั้งเรื่องอาหาร, การเงิน, การวางแผนชีวิต, วันสำคัญ, กำลังใจ หรือเรื่องทั่วไป) อย่างมีชีวิตชีวาและสร้างสรรค์
+- ตอบคำถามทุกหัวข้อ (ทั้งเรื่องของขวัญ, การเงิน, การวางแผนชีวิต, วันสำคัญ, กำลังใจ หรือเรื่องทั่วไป) อย่างมีชีวิตชีวาและสร้างสรรค์
 - ใช้ Emoji ประกอบน่ารักๆ จัดรูปแบบ Markdown ให้อ่านง่าย
 
 คำถามจากต๋อง:
 $query
 ''';
 
-    final models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-1.5-pro'];
+    final models = [
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.7-flash',
+      'gemini-3.6-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+    ];
 
     for (final model in models) {
       try {
