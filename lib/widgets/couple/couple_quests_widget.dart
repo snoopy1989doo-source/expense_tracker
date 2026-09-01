@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:js_util' as js_util;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/couple_provider.dart';
@@ -314,6 +316,14 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
 
   int _extraFortuneOffset = 0;
 
+  void _openWebUrl(String url) {
+    if (kIsWeb) {
+      try {
+        js_util.callMethod(js_util.globalThis, 'open', [url, '_blank']);
+      } catch (_) {}
+    }
+  }
+
   void _showFortuneDetailsDialog({
     required String dayName,
     required int loveScore,
@@ -328,6 +338,7 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           final stars = (moneyScore / 20).clamp(1, 5).toInt();
+          final isWarningDay = moneyScore < 70;
 
           return AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -336,136 +347,202 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade100,
+                    color: isWarningDay ? Colors.orange.shade100 : Colors.amber.shade100,
                     shape: BoxShape.circle,
                   ),
-                  child: const Text('🔮', style: TextStyle(fontSize: 20)),
+                  child: Text(isWarningDay ? '⚠️' : '🔮', style: const TextStyle(fontSize: 20)),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('เซียมซีดวงการเงินคู่รัก', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      const Text('เซียมซี & ดวงการเงินคู่รัก', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       Text('ประจำ$dayName (${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year})', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                     ],
                   ),
                 ),
               ],
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Star Rating
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (idx) {
-                    return Icon(
-                      idx < stars ? Icons.star : Icons.star_border,
-                      color: Colors.amber,
-                      size: 24,
-                    );
-                  }),
-                ),
-                const SizedBox(height: 12),
-
-                // 3 Scores Grid
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(16),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Star Rating
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (idx) {
+                      return Icon(
+                        idx < stars ? Icons.star : Icons.star_border,
+                        color: isWarningDay ? Colors.orange : Colors.amber,
+                        size: 24,
+                      );
+                    }),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  const SizedBox(height: 12),
+
+                  // 3 Scores Grid
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Column(
+                          children: [
+                            const Text('💖 ความรัก', style: TextStyle(fontSize: 11)),
+                            const SizedBox(height: 4),
+                            Text('$loveScore/100', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary)),
+                          ],
+                        ),
+                        Column(
+                          children: [
+                            const Text('💰 การเงิน', style: TextStyle(fontSize: 11)),
+                            const SizedBox(height: 4),
+                            Text('$moneyScore/100', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: moneyScore >= 75 ? AppColors.income : (moneyScore >= 60 ? Colors.orange : AppColors.expense))),
+                          ],
+                        ),
+                        Column(
+                          children: [
+                            const Text('😊 ความสุข', style: TextStyle(fontSize: 11)),
+                            const SizedBox(height: 4),
+                            Text('$happinessScore/100', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.deepPurple)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Advice Box
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isWarningDay ? Colors.orange.shade50 : Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: isWarningDay ? Colors.orange.shade200 : Colors.amber.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(isWarningDay ? '⚠️ ข้อควรระวัง & คำทำนายวันนี้:' : '📜 คำทำนาย & เคล็ดลับการเงินคู่เรา:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isWarningDay ? Colors.brown.shade800 : Colors.brown)),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(quote, style: TextStyle(fontSize: 13, height: 1.4, color: Colors.brown.shade900)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Birthdate & Couple Zodiac Analysis Box
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.pink.shade50.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.pink.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.auto_awesome, size: 14, color: AppColors.primary),
+                            SizedBox(width: 6),
+                            Text('ดวงคู่รักตามวันเกิด (ต๋อง ♑ & ฝน ♑)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primary)),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          '• ต๋อง (17 ม.ค. ราศีมังกร/วันศุกร์): ดาวศุกร์หนุนนำความมั่งคั่งจากงานหลัก ระวังรายจ่ายเกี่ยวกับอุปกรณ์/รถยนต์\n• ฝน (15 ม.ค. ราศีมังกร/วันพุธ): ดาวพุธเด่นเจรจาค้าขายคล่อง ช้อปออนไลน์แนะนำคุยกับแฟนก่อนกดสั่ง\n• พลังมังกรคู่รักธาตุดิน: หนุนดวงการเก็บเงินสร้างอนาคตร่วมกันได้มั่นคงเป็นพิเศษ!',
+                          style: TextStyle(fontSize: 11, height: 1.45, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Lucky Elements
+                  Row(
                     children: [
-                      Column(
-                        children: [
-                          const Text('💖 ความรัก', style: TextStyle(fontSize: 11)),
-                          const SizedBox(height: 4),
-                          Text('$loveScore/100', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary)),
-                        ],
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                          ),
+                          child: Column(
+                            children: [
+                              const Text('🎨 สีมงคลวันนี้', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                              const SizedBox(height: 2),
+                              Text(luckyColor, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11), textAlign: TextAlign.center),
+                            ],
+                          ),
+                        ),
                       ),
-                      Column(
-                        children: [
-                          const Text('💰 การเงิน', style: TextStyle(fontSize: 11)),
-                          const SizedBox(height: 4),
-                          Text('$moneyScore/100', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.income)),
-                        ],
-                      ),
-                      Column(
-                        children: [
-                          const Text('😊 ความสุข', style: TextStyle(fontSize: 11)),
-                          const SizedBox(height: 4),
-                          Text('$happinessScore/100', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.orange)),
-                        ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                          ),
+                          child: Column(
+                            children: [
+                              const Text('🔢 เลขนำโชค', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                              const SizedBox(height: 2),
+                              Text(luckyNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary)),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 14),
+                  const SizedBox(height: 14),
 
-                // Advice Box
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.amber.shade200),
-                  ),
-                  child: Column(
+                  // External Daily Horoscope Links
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('📜 คำทำนาย & เคล็ดลับการเงินคู่เรา:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.brown)),
+                      const Text('🌐 ลิงก์ดูดวงรายวันสดใหม่ (อัปเดตทุกวัน):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
                       const SizedBox(height: 6),
-                      Text(quote, style: const TextStyle(fontSize: 13, height: 1.4, color: Colors.brown)),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          ActionChip(
+                            avatar: const Text('🌟', style: TextStyle(fontSize: 12)),
+                            label: const Text('Sanook ดูดวง', style: TextStyle(fontSize: 11)),
+                            onPressed: () => _openWebUrl('https://www.sanook.com/horoscope/'),
+                          ),
+                          ActionChip(
+                            avatar: const Text('🔮', style: TextStyle(fontSize: 12)),
+                            label: const Text('ไทยรัฐ ดวงรายวัน', style: TextStyle(fontSize: 11)),
+                            onPressed: () => _openWebUrl('https://www.thairath.co.th/horoscope/daily'),
+                          ),
+                          ActionChip(
+                            avatar: const Text('🥠', style: TextStyle(fontSize: 12)),
+                            label: const Text('MyHora ดูดวง', style: TextStyle(fontSize: 11)),
+                            onPressed: () => _openWebUrl('https://www.myhora.com/'),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 12),
-
-                // Lucky Elements
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                        ),
-                        child: Column(
-                          children: [
-                            const Text('🎨 สีมงคลวันนี้', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                            const SizedBox(height: 2),
-                            Text(luckyColor, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11), textAlign: TextAlign.center),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                        ),
-                        child: Column(
-                          children: [
-                            const Text('🔢 เลขนำโชค', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                            const SizedBox(height: 2),
-                            Text(luckyNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
             actions: [
               TextButton.icon(
@@ -537,25 +614,31 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
     final dayOfYear = now.difference(DateTime(now.year, 1, 1)).inDays + 1;
     final seed = (now.year * 1000 + dayOfYear * 47 + roomHash * 23 + _extraFortuneOffset);
 
-    // Dynamic Daily Scores
-    final loveScore = 80 + (seed * 7 + 13) % 20; // 80 - 99
-    final moneyScore = 65 + (seed * 11 + 29) % 35; // 65 - 99
-    final happinessScore = 82 + (seed * 13 + 17) % 18; // 82 - 99
+    // Dynamic Daily Scores (Realistic range from caution to peak luck)
+    final loveScore = 65 + (seed * 7 + 13) % 35; // 65 - 99
+    final moneyScore = 52 + (seed * 11 + 29) % 47; // 52 - 98 (both caution & lucky days)
+    final happinessScore = 62 + (seed * 13 + 17) % 37; // 62 - 98
 
-    // Curated Financial & Love Tips
+    // Curated Financial & Love Tips (Rich variety: Caution vs Fortune)
     final List<String> dailyQuotes = [
       '✨ วันนี้ดวงการเงินสดใส มีเกณฑ์ได้รับส่วนลดพิเศษหรือโชคลาภเล็กๆ!',
       '🧋 ระวังเงินรั่วไหลกับของหวาน/ชานมช่วงบ่าย ดื่มน้ำเปล่าเติมความสดชื่นแทนนะ',
+      '⚠️ วันนี้มีเกณฑ์รายจ่ายจุกจิกกะทันหัน แนะนำตรวจสอบราคาก่อนกดสั่งซื้อ',
       '🍲 มื้อนี้เหมาะแก่การทำอาหารกินเองที่บ้าน อร่อย อบอุ่น และเซฟงบสุดๆ',
       '💳 ก่อนกดช้อปปิ้งออนไลน์คืนนี้ ชวนแฟนคุยก่อนสัก 5 นาที ช่วยคุมงบได้ดีเยี่ยม',
       '🌟 วันนี้ดวงเก็บเงินเฮงมาก เหมาะแก่การหยอดกระปุกออมสินคู่รัก!',
       '🚗 เดินทางราบรื่น วางแผนเส้นทางดีช่วยประหยัดค่าน้ำมันได้เยอะ',
+      '⚠️ ระวังความอยากได้ของเซลล์ล่อตาล่อใจ ซื้อเฉพาะของที่จำเป็นจริงๆ นะครับ',
       '🎁 มีเกณฑ์ได้ของถูกใจในราคาคุ้มค่า ตาดีได้ของลดราคาปังๆ',
       '💖 ความรักหนุนดวงการเงิน ยิ่งช่วยกันวางแผน ยิ่งรวยและมีความสุข',
       '☕ ลองลดกาแฟแก้วแพง แล้วเติมความหวานด้วยคำชมแฟนดูนะคร้าบ',
       '🎉 วันนี้การเงินคล่องตัว คุมงบได้ตามเป้าหมายแบบไร้กังวล!',
       '🧾 บันทึกรายจ่ายวันนี้ให้ครบ จะช่วยให้เห็นเงินเก็บก้อนโตสิ้นเดือน',
+      '⚠️ หลีกเลี่ยงการให้คนอื่นยืมเงินหรือรูดบัตรแทนในวันนี้ เพื่อความปลอดภัยทางการเงิน',
       '🍱 อาหารมื้อเย็นวันนี้สั่งแบบประหยัดหรือกินที่เดิม อิ่มคุ้มสบายกระเป๋า',
+      '🍀 วันนี้เหมาะแก่การเช็กโปรโมชั่นหรือคูปองส่วนลดก่อนชำระเงิน',
+      '💡 ตรวจสอบบิลค่าน้ำค่าไฟในบ้าน ปิดสวิตช์ที่ไม่ใช้ ช่วยเซฟงบสิ้นเดือนได้เยอะ',
+      '🛍️ วันนี้ดวงการเงินนิ่งๆ เหมาะกับการวางแผนเก็บออมเพื่อทริปเที่ยวคู่รัก',
     ];
 
     final quoteIndex = (seed * 3 + 7) % dailyQuotes.length;

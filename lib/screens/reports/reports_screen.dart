@@ -18,6 +18,7 @@ class ReportsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final report = ref.watch(reportProvider);
     final filters = ref.watch(transactionFiltersProvider);
+    final filterNotifier = ref.read(transactionFiltersProvider.notifier);
     final mainCats = ref.watch(mainCategoriesProvider);
     final subCats = ref.watch(subCategoriesProvider);
     final wallets = ref.watch(walletsProvider);
@@ -62,6 +63,70 @@ class ReportsScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Month Navigator & Historical Period Selector
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    tooltip: 'เดือนก่อนหน้า',
+                    onPressed: () => filterNotifier.previousMonth(),
+                  ),
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: filters.selectedMonth,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2035),
+                        helpText: 'เลือกเดือนและปีที่ต้องการดูรายงาน',
+                      );
+                      if (picked != null) {
+                        filterNotifier.setMonth(picked);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.calendar_month, size: 18, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            monthName,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.arrow_drop_down, size: 20, color: Colors.grey),
+                        ],
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    tooltip: 'เดือนถัดไป',
+                    onPressed: () => filterNotifier.nextMonth(),
+                  ),
+                ],
+              ),
+            ),
+
             // Month Header summary
             Card(
               child: Padding(

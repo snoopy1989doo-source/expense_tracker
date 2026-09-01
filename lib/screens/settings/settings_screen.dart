@@ -18,6 +18,22 @@ import '../couple/couple_setup_screen.dart';
 import '../../widgets/common/confirm_dialog.dart';
 import '../../core/constants/app_colors.dart';
 
+final Map<String, Uint8List> _base64ImageCache = {};
+
+Uint8List? _getCachedImageBytes(String? dataUrl) {
+  if (dataUrl == null || !dataUrl.startsWith('data:image')) return null;
+  if (_base64ImageCache.containsKey(dataUrl)) {
+    return _base64ImageCache[dataUrl];
+  }
+  try {
+    final bytes = base64Decode(dataUrl.split(',').last);
+    _base64ImageCache[dataUrl] = bytes;
+    return bytes;
+  } catch (_) {
+    return null;
+  }
+}
+
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -196,13 +212,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final theme = Theme.of(context);
     final userId = authState.userId ?? '';
 
-    Uint8List? profileImageBytes;
     final photoUrl = userProfile?.photoBase64;
-    if (photoUrl != null && photoUrl.startsWith('data:image')) {
-      try {
-        profileImageBytes = base64Decode(photoUrl.split(',').last);
-      } catch (_) {}
-    }
+    final profileImageBytes = _getCachedImageBytes(photoUrl);
 
     void confirmResetCategories() {
       ConfirmDialog.show(
@@ -368,13 +379,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     final partnerProfile = ref.watch(partnerProfileProvider).value;
 
-    Uint8List? partnerImageBytes;
     final partnerPhotoUrl = partnerProfile?.photoBase64;
-    if (partnerPhotoUrl != null && partnerPhotoUrl.startsWith('data:image')) {
-      try {
-        partnerImageBytes = base64Decode(partnerPhotoUrl.split(',').last);
-      } catch (_) {}
-    }
+    final partnerImageBytes = _getCachedImageBytes(partnerPhotoUrl);
 
     return Scaffold(
       appBar: AppBar(

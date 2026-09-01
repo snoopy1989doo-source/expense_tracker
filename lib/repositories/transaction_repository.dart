@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/transaction_item.dart';
@@ -15,6 +16,7 @@ class FirestoreTransactionRepository implements TransactionRepository {
   final FirebaseFirestore? _firestore;
   final SharedPreferences _prefs;
   bool _useLocalMock = false;
+  StreamController<List<TransactionItem>>? _localTransactionsController;
 
   FirestoreTransactionRepository(this._firestore, this._prefs) {
     if (_firestore == null) {
@@ -52,9 +54,15 @@ class FirestoreTransactionRepository implements TransactionRepository {
   @override
   Stream<List<TransactionItem>> watchTransactions(String roomId) {
     if (_useLocalMock || roomId == 'guest_user') {
-      // Return a periodic stream that reads from local mock storage
-      return Stream.periodic(const Duration(seconds: 4))
-          .asyncMap((_) => _getLocalTransactions(roomId));
+      _localTransactionsController ??= StreamController<List<TransactionItem>>.broadcast(
+        onListen: () async {
+          final initial = await _getLocalTransactions(roomId);
+          if (_localTransactionsController != null && !_localTransactionsController!.isClosed) {
+            _localTransactionsController!.add(initial);
+          }
+        },
+      );
+      return _localTransactionsController!.stream;
     }
     return _firestore!
         .collection('couple_rooms')
@@ -163,8 +171,12 @@ class FirestoreTransactionRepository implements TransactionRepository {
     } else {
       list.add(transaction);
     }
+    list.sort((a, b) => b.date.compareTo(a.date));
     final encoded = jsonEncode(list.map((t) => t.toLocalMap()).toList());
     await _prefs.setString(key, encoded);
+    if (_localTransactionsController != null && !_localTransactionsController!.isClosed) {
+      _localTransactionsController!.add(list);
+    }
   }
 
   Future<void> _deleteLocalTransaction(String roomId, String transactionId) async {
@@ -173,5 +185,8 @@ class FirestoreTransactionRepository implements TransactionRepository {
     list.removeWhere((t) => t.id == transactionId);
     final encoded = jsonEncode(list.map((t) => t.toLocalMap()).toList());
     await _prefs.setString(key, encoded);
+    if (_localTransactionsController != null && !_localTransactionsController!.isClosed) {
+      _localTransactionsController!.add(list);
+    }
   }
 }

@@ -83,9 +83,12 @@ class RawWalletsNotifier extends StateNotifier<List<Wallet>> {
 
   Future<void> reorderWallets(List<Wallet> reordered) async {
     if (_roomId == null) return;
-    state = reordered;
-    for (int i = 0; i < reordered.length; i++) {
-      final updated = reordered[i].copyWith(order: i);
+    final updatedList = [
+      for (int i = 0; i < reordered.length; i++)
+        reordered[i].copyWith(order: i)
+    ];
+    state = updatedList;
+    for (final updated in updatedList) {
       await _repository.saveWallet(_roomId, updated);
     }
   }

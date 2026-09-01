@@ -71,9 +71,12 @@ class MainCategoriesNotifier extends StateNotifier<List<MainCategory>> {
 
   Future<void> reorderCategories(List<MainCategory> reordered) async {
     if (_roomId == null) return;
-    state = reordered;
-    for (int i = 0; i < reordered.length; i++) {
-      final updated = reordered[i].copyWith(order: i);
+    final updatedList = [
+      for (int i = 0; i < reordered.length; i++)
+        reordered[i].copyWith(order: i)
+    ];
+    state = updatedList;
+    for (final updated in updatedList) {
       await _repository.saveMainCategory(_roomId, updated);
     }
   }
@@ -104,14 +107,17 @@ class SubCategoriesNotifier extends StateNotifier<List<SubCategory>> {
 
   Future<void> reorderSubCategories(List<SubCategory> reordered) async {
     if (_roomId == null) return;
-    // Update local state immediately for instant feedback
+    // Pre-assign order to reordered items
+    final updatedReordered = [
+      for (int i = 0; i < reordered.length; i++)
+        reordered[i].copyWith(order: i)
+    ];
     final currentList = List<SubCategory>.from(state);
-    final idsToUpdate = reordered.map((s) => s.id).toSet();
+    final idsToUpdate = updatedReordered.map((s) => s.id).toSet();
     final remaining = currentList.where((s) => !idsToUpdate.contains(s.id)).toList();
-    state = [...reordered, ...remaining];
+    state = [...updatedReordered, ...remaining];
 
-    for (int i = 0; i < reordered.length; i++) {
-      final updated = reordered[i].copyWith(order: i);
+    for (final updated in updatedReordered) {
       await _repository.saveSubCategory(_roomId, updated);
     }
   }

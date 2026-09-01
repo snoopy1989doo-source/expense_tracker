@@ -156,6 +156,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
 
   Future<void> _analyzeSlipAndAutoFill(String fileName, Uint8List bytes, String base64Str) async {
     final mainCats = ref.read(mainCategoriesProvider);
+    final subCats = ref.read(subCategoriesProvider);
     final coupleRoomId = ref.read(coupleRoomIdProvider);
 
     if (mounted) {
@@ -295,7 +296,46 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
 
     // Keyword rule-based fallback if AI hasn't learned yet
     if (matchedCategory == null) {
-      if (fullTextToScan.contains('pea') || fullTextToScan.contains('ไฟฟ้า') || fullTextToScan.contains('ภูมิภาค')) {
+      // 1. Fuel / Gas Stations (ปตท, PTT, Oil, ปิโตรเลียม, บางจาก, เชลล์, Caltex, PT, Esso, Susco)
+      if (fullTextToScan.contains('ปตท') ||
+          fullTextToScan.contains('ptt') ||
+          fullTextToScan.contains('ปิโตรเลียม') ||
+          fullTextToScan.contains('petroleum') ||
+          fullTextToScan.contains('ออยล์') ||
+          fullTextToScan.contains('ออย') ||
+          fullTextToScan.contains('oil') ||
+          fullTextToScan.contains('น้ำมัน') ||
+          fullTextToScan.contains('เชลล์') ||
+          fullTextToScan.contains('shell') ||
+          fullTextToScan.contains('บางจาก') ||
+          fullTextToScan.contains('bangchak') ||
+          fullTextToScan.contains('caltex') ||
+          fullTextToScan.contains('คาลเท็กซ์') ||
+          fullTextToScan.contains('ptg') ||
+          fullTextToScan.contains('พีที') ||
+          fullTextToScan.contains('เอสโซ่') ||
+          fullTextToScan.contains('esso') ||
+          fullTextToScan.contains('susco') ||
+          fullTextToScan.contains('ซัสโก้')) {
+        final transportCat = mainCats.firstWhere(
+          (c) => c.name.contains('เดินทาง') || c.name.contains('Transport') || c.id.contains('transport') || c.name.contains('รถ'),
+          orElse: () => mainCats.first,
+        );
+        matchedCategory = transportCat.id;
+
+        // Find fuel subcategory
+        final fuelSub = subCats.firstWhere(
+          (s) => s.mainCategoryId == transportCat.id && (s.name.contains('น้ำมัน') || s.id.contains('fuel')),
+          orElse: () => subCats.firstWhere((s) => s.mainCategoryId == transportCat.id, orElse: () => subCats.first),
+        );
+        matchedSubCategory = fuelSub.id;
+
+        if (_noteController.text.trim().isEmpty) {
+          _noteController.text = _detectedReceiverName != null && _detectedReceiverName!.isNotEmpty
+              ? '$_detectedReceiverName (ค่าน้ำมัน)'
+              : 'ค่าน้ำมันรถ ⛽';
+        }
+      } else if (fullTextToScan.contains('pea') || fullTextToScan.contains('ไฟฟ้า') || fullTextToScan.contains('ภูมิภาค')) {
         matchedCategory = mainCats.firstWhere(
           (c) => c.name.contains('ไฟ') || c.name.contains('น้ำ') || c.name.contains('Living'),
           orElse: () => mainCats.first,

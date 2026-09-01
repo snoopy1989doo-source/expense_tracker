@@ -29,7 +29,7 @@ class _WalletManagementScreenState extends ConsumerState<WalletManagementScreen>
 
   void _showAddEditWalletDialog([Wallet? existing]) {
     _nameController.text = existing?.name ?? '';
-    _balanceController.text = existing?.startingBalance.toString() ?? '0.0';
+    _balanceController.text = existing != null ? existing.currentBalance.toStringAsFixed(2) : '0.00';
     _dialogColor = existing != null ? AppColors.fromHex(existing.color) : AppColors.categoryPalette.first;
     _selectedIcon = existing?.icon ?? 'account_balance_wallet';
 
@@ -54,11 +54,10 @@ class _WalletManagementScreenState extends ConsumerState<WalletManagementScreen>
                 TextField(
                   controller: _balanceController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'ยอดเงินเริ่มต้น (บาท)',
+                  decoration: InputDecoration(
+                    labelText: existing == null ? 'ยอดเงินเริ่มต้น (บาท)' : 'ยอดเงินคงเหลือปัจจุบัน (บาท)',
                     hintText: '0.00',
                   ),
-                  readOnly: existing != null, // Don't let users edit starting balance of existing wallet
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
@@ -106,13 +105,22 @@ class _WalletManagementScreenState extends ConsumerState<WalletManagementScreen>
               onPressed: () {
                 if (_nameController.text.trim().isNotEmpty) {
                   final walletList = ref.read(walletsProvider);
+                  final inputBalance = double.tryParse(_balanceController.text.trim()) ?? 0.0;
+                  final double startingBalance;
+                  if (existing == null) {
+                    startingBalance = inputBalance;
+                  } else {
+                    final diff = inputBalance - existing.currentBalance;
+                    startingBalance = existing.startingBalance + diff;
+                  }
+
                   final wallet = Wallet(
                     id: existing?.id ?? 'wallet_${const Uuid().v4()}',
                     name: _nameController.text.trim(),
                     color: AppColors.toHex(_dialogColor),
                     icon: _selectedIcon,
-                    startingBalance: double.tryParse(_balanceController.text) ?? 0.0,
-                    currentBalance: existing?.currentBalance ?? (double.tryParse(_balanceController.text) ?? 0.0),
+                    startingBalance: startingBalance,
+                    currentBalance: inputBalance,
                     order: existing?.order ?? walletList.length,
                     createdAt: existing?.createdAt ?? DateTime.now(),
                   );
