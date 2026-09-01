@@ -14,6 +14,9 @@ class CurrencyFormatter {
         return '-$formatted ฿';
       }
     }
+    if (amount < 0) {
+      return '-$formatted ฿';
+    }
     return '$formatted ฿';
   }
 
