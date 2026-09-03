@@ -382,6 +382,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final partnerPhotoUrl = partnerProfile?.photoBase64;
     final partnerImageBytes = _getCachedImageBytes(partnerPhotoUrl);
 
+    final String partnerName;
+    if (partnerProfile != null) {
+      if (partnerProfile.nickname.isNotEmpty) {
+        partnerName = partnerProfile.nickname;
+      } else if (partnerProfile.email.isNotEmpty) {
+        partnerName = partnerProfile.email.split('@').first;
+      } else {
+        partnerName = 'แฟน 💕';
+      }
+    } else {
+      partnerName = coupleRoomAsync.value?.isFull == true ? 'แฟน 💕' : 'ยังไม่มีคู่รัก';
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('ตั้งค่าระบบ'),
@@ -630,7 +643,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                partnerProfile?.nickname ?? (coupleRoomAsync.value?.isFull == true ? 'แฟนของคุณ' : 'ยังไม่มีคู่รัก'),
+                                partnerName,
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -667,11 +680,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   },
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 9),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surface,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: theme.colorScheme.outlineVariant),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.6)),
                     ),
                     alignment: Alignment.center,
                     child: Row(
@@ -680,7 +693,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         const Icon(Icons.settings, size: 14, color: AppColors.primary),
                         const SizedBox(width: 6),
                         Text(
-                          coupleRoomId != null ? 'จัดการห้องคู่รัก & โค้ดเชิญ' : 'เชื่อมต่อหรือสร้างห้องคู่รัก 💕',
+                          coupleRoomId != null ? 'จัดการห้องคู่รัก' : 'เชื่อมต่อห้องคู่รัก 💕',
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
                         ),
                       ],
@@ -690,89 +703,252 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
           ),
-          const Divider(),
+          const SizedBox(height: 8),
 
-          // Theme selection
-          ListTile(
-            leading: Icon(isDark ? Icons.dark_mode : Icons.light_mode, color: theme.colorScheme.primary),
-            title: const Text('โหมดมืด', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(isDark ? 'เปิดใช้งานโหมดมืด' : 'ปิดใช้งานโหมดมืด'),
-            trailing: Switch(
-              value: isDark,
-              onChanged: (val) => themeNotifier.toggleTheme(),
+          // ─── SECTION 1: FINANCIAL CATEGORIES & WALLETS ───
+          _buildSectionCard(
+            context: context,
+            title: 'หมวดหมู่ & บัญชี',
+            children: [
+              _buildSettingTile(
+                context: context,
+                icon: Icons.category_rounded,
+                iconColor: const Color(0xFFFF6584),
+                iconBgColor: const Color(0xFFFF6584).withOpacity(0.12),
+                title: 'หมวดหมู่รายรับ-รายจ่าย',
+                subtitle: 'จัดการหมวดและ Emoji',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CategoryManagementScreen()),
+                  );
+                },
+              ),
+              _buildSettingTile(
+                context: context,
+                icon: Icons.account_balance_wallet_rounded,
+                iconColor: const Color(0xFF3182CE),
+                iconBgColor: const Color(0xFF3182CE).withOpacity(0.12),
+                title: 'กระเป๋าเงิน & บัญชี',
+                subtitle: 'จัดการบัญชีและยอดคงเหลือ',
+                showDivider: false,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const WalletManagementScreen()),
+                  );
+                },
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          // ─── SECTION 2: DISPLAY & AI ───
+          _buildSectionCard(
+            context: context,
+            title: 'การแสดงผล & AI',
+            children: [
+              _buildSettingTile(
+                context: context,
+                icon: isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                iconColor: Colors.purple.shade600,
+                iconBgColor: Colors.purple.shade50,
+                title: 'โหมดมืด',
+                trailing: Switch(
+                  value: isDark,
+                  activeColor: AppColors.primary,
+                  onChanged: (val) => themeNotifier.toggleTheme(),
+                ),
+              ),
+              _buildSettingTile(
+                context: context,
+                icon: Icons.auto_awesome_rounded,
+                iconColor: Colors.amber.shade800,
+                iconBgColor: Colors.amber.shade50,
+                title: 'AI Gemini API Key',
+                subtitle: 'ตั้งค่ากุญแจ AI วางแผนการเงิน',
+                showDivider: false,
+                onTap: showGeminiApiKeyDialog,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          // ─── SECTION 3: DATA & ACCOUNT ───
+          _buildSectionCard(
+            context: context,
+            title: 'จัดการข้อมูล & บัญชี',
+            children: [
+              _buildSettingTile(
+                context: context,
+                icon: Icons.restart_alt_rounded,
+                iconColor: Colors.orange.shade700,
+                iconBgColor: Colors.orange.shade50,
+                title: 'คืนค่าหมวดหมู่เริ่มต้น',
+                subtitle: 'รีเซ็ตหมวดหมู่เป็นค่าเริ่มต้น',
+                onTap: confirmResetCategories,
+              ),
+              _buildSettingTile(
+                context: context,
+                icon: Icons.assignment_ind_rounded,
+                iconColor: Colors.teal.shade700,
+                iconBgColor: Colors.teal.shade50,
+                title: 'เริ่มต้นตั้งค่าใหม่',
+                subtitle: 'ทำแบบสอบถามตั้งต้นใหม่อีกครั้ง',
+                onTap: confirmResetOnboarding,
+              ),
+              _buildSettingTile(
+                context: context,
+                icon: Icons.logout_rounded,
+                iconColor: AppColors.expense,
+                iconBgColor: AppColors.expense.withOpacity(0.1),
+                title: 'ออกจากระบบ',
+                titleColor: AppColors.expense,
+                showDivider: false,
+                onTap: confirmLogout,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Footer Info
+          Center(
+            child: Text(
+              'บัญชี: ${userProfile?.email ?? authState.userId ?? "ผู้ใช้"} • Kapookluxx v1.0.0',
+              style: TextStyle(
+                fontSize: 11,
+                color: theme.colorScheme.onSurface.withOpacity(0.4),
+              ),
             ),
           ),
-          const Divider(),
+          const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
 
-          // Navigation Links
-          ListTile(
-            leading: const Icon(Icons.category_outlined, color: AppColors.primary),
-            title: const Text('จัดการหมวดหมู่หลัก & หมวดหมู่ย่อย', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('เพิ่ม แก้ไข ลบ จัดการสีและ emoji ของหมวดหมู่การจดเงิน'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const CategoryManagementScreen()),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.account_balance_wallet_outlined, color: AppColors.primary),
-            title: const Text('จัดการกระเป๋าเงิน & บัญชี', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('เพิ่ม แก้ไข ปรับยอดเงินคงเหลือ และจัดการกระเป๋าเงินทั้งหมด'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const WalletManagementScreen()),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.auto_awesome, color: AppColors.primary),
-            title: const Text('ตั้งค่า Google Gemini API Key 🤖', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('ใส่ API Key เพื่อเปิดใช้งาน AI ตอบคำถามปลายเปิดและวางแผนการเงินแบบไม่จำกัด'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: showGeminiApiKeyDialog,
-          ),
-          const Divider(),
-
-          // Database administration / reset helpers
-          ListTile(
-            leading: const Icon(Icons.refresh, color: AppColors.primary),
-            title: const Text('รีเซ็ตหมวดหมู่เริ่มต้น', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('ย้อนโครงสร้างหมวดหมู่กลับเป็นค่าเริ่มต้นตามที่แนะนำในระบบ'),
-            onTap: confirmResetCategories,
-          ),
-          ListTile(
-            leading: const Icon(Icons.assignment_ind_outlined, color: AppColors.primary),
-            title: const Text('เริ่มขั้นตอนแนะนำเริ่มต้นใหม่', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('กลับไปตอบคำถามแนะนำตั้งต้นกระเป๋าเงินและหมวดหมู่อีกครั้ง'),
-            onTap: confirmResetOnboarding,
-          ),
-          const Divider(),
-
-          // User detail and logout
+  Widget _buildSectionCard({
+    required BuildContext context,
+    required String title,
+    required List<Widget> children,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            padding: const EdgeInsets.only(left: 4, bottom: 6),
             child: Text(
-              'บัญชีผู้ใช้ปัจจุบัน: ${authState.userId ?? "Guest"}',
+              title,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                color: theme.colorScheme.onSurface.withOpacity(0.55),
+                letterSpacing: 0.2,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.exit_to_app, color: AppColors.expense),
-            title: const Text('ออกจากระบบ', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.expense)),
-            onTap: confirmLogout,
+          Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Column(children: children),
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSettingTile({
+    required BuildContext context,
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBgColor,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+    bool showDivider = true,
+    Color? titleColor,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: titleColor ?? theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      if (subtitle != null && subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (trailing != null)
+                  trailing
+                else if (onTap != null)
+                  Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurface.withOpacity(0.3)),
+              ],
+            ),
+          ),
+        ),
+        if (showDivider)
+          Divider(
+            height: 1,
+            thickness: 0.5,
+            indent: 62,
+            endIndent: 14,
+            color: theme.colorScheme.outlineVariant.withOpacity(0.3),
+          ),
+      ],
     );
   }
 }
