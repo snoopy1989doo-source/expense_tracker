@@ -1,10 +1,10 @@
-﻿{
+{
     "name": "Kapookluxx",
     "short_name": "Kapookluxx",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#E91E63",
-    "theme_color": "#E91E63",
+    "background_color": "#FF6584",
+    "theme_color": "#FF6584",
     "description": "Kapookluxx — แอปรายรับ-รายจ่ายสำหรับคู่รัก",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,

@@ -53,6 +53,19 @@ class MyApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: isDarkTheme ? ThemeMode.dark : ThemeMode.light,
+      builder: (context, child) {
+        return Container(
+          color: isDarkTheme ? const Color(0xFF090A0F) : const Color(0xFFF1F5F9),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: ClipRect(
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        );
+      },
       
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
