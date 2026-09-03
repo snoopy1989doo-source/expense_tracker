@@ -46,6 +46,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   Uint8List? _selectedImageBytes;
   String? _existingImageUrl;
   final List<String> _receiptImagesList = []; // Multi-image support
+  bool _isScanningSlip = false; // Scanning animation state
   bool _isSaving = false;
   String? _detectedReceiverName; // AI Merchant / Receiver Quiet Memory
 
@@ -155,6 +156,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   }
 
   Future<void> _analyzeSlipAndAutoFill(String fileName, Uint8List bytes, String base64Str) async {
+    setState(() => _isScanningSlip = true);
     final mainCats = ref.read(mainCategoriesProvider);
     final subCats = ref.read(subCategoriesProvider);
     final coupleRoomId = ref.read(coupleRoomIdProvider);
@@ -400,6 +402,9 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
           duration: const Duration(seconds: 4),
         ),
       );
+    }
+    if (mounted) {
+      setState(() => _isScanningSlip = false);
     }
   }
 
@@ -712,34 +717,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   }
 
   void _showImagePickerOptions() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
-      ),
-      builder: (context) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('ถ่ายรูปจากกล้อง'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickImage(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('เลือกจากแกลเลอรี'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickImage(ImageSource.gallery);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+    _pickImage(ImageSource.gallery);
   }
 
   Future<void> _selectDate() async {
@@ -1527,38 +1505,63 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   }
 
   Widget _buildSmartSlipScannerCard(BuildContext context, ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [
+                  const Color(0xFF241A28),
+                  const Color(0xFF1C1929),
+                  theme.colorScheme.surface,
+                ]
+              : [
+                  const Color(0xFFFFF0F5),
+                  const Color(0xFFFFF6F0),
+                  theme.colorScheme.surface,
+                ],
+        ),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: _receiptImagesList.isNotEmpty
-              ? AppColors.primary.withOpacity(0.5)
-              : theme.colorScheme.primary.withOpacity(0.2),
+              ? AppColors.primary.withOpacity(isDark ? 0.6 : 0.45)
+              : AppColors.primary.withOpacity(isDark ? 0.35 : 0.25),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: AppColors.primary.withOpacity(isDark ? 0.12 : 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row with Icon, Title & Badge
+          // Header row with Icon, Title, Badge & Optional Camera Button
           Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.12),
-                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF6584), Color(0xFFFF8E72)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF6584).withOpacity(0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                child: const Icon(Icons.document_scanner_rounded, color: AppColors.primary, size: 18),
+                child: const Icon(Icons.document_scanner_rounded, color: Colors.white, size: 18),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1568,20 +1571,20 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                     Row(
                       children: [
                         const Text(
-                          'สแกนสลิป / แนบรูปภาพ',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          'สแกนสลิปอัจฉริยะ ⚡',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                         ),
                         if (_receiptImagesList.isNotEmpty) ...[
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
                               color: AppColors.primary,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
                               '${_receiptImagesList.length} สลิป',
-                              style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                              style: const TextStyle(fontSize: 9.5, color: Colors.white, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
@@ -1594,98 +1597,191 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Action Buttons: Camera & Album
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => _pickImage(ImageSource.camera),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.camera_alt_rounded, size: 16, color: AppColors.primary),
-                        SizedBox(width: 6),
-                        Text(
-                          'ถ่ายรูปสลิป',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: InkWell(
-                  onTap: () => _pickImage(ImageSource.gallery),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.photo_library_rounded, size: 16, color: AppColors.primary),
-                        SizedBox(width: 6),
-                        Text(
-                          'เลือกรูปจากอัลบั้ม',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              // Subtle camera button if user ever wants live capture
+              IconButton(
+                icon: Icon(Icons.camera_alt_outlined, size: 19, color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                tooltip: 'ถ่ายภาพจากกล้องสด',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () => _pickImage(ImageSource.camera),
               ),
             ],
           ),
+          const SizedBox(height: 14),
 
-          // Attached Images Thumbnails strip
-          if (_receiptImagesList.isNotEmpty) ...[
-            const SizedBox(height: 12),
+          // State 1: Scanning In Progress
+          if (_isScanningSlip) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1724) : Colors.white.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.primary.withOpacity(0.35)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.2, color: AppColors.primary),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '🤖 Gemini AI กำลังอ่านยอดเงินจากสลิป...',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFFFF8FA3) : AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      minHeight: 4,
+                      color: AppColors.primary,
+                      backgroundColor: AppColors.primary.withOpacity(0.15),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ]
+
+          // State 2: No slip attached yet -> Direct Tap-to-Gallery Zone
+          else if (_receiptImagesList.isEmpty) ...[
+            InkWell(
+              onTap: () => _pickImage(ImageSource.gallery),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1C1929).withOpacity(0.85) : Colors.white.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.primary.withOpacity(isDark ? 0.35 : 0.25),
+                    width: 1.2,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Centerpiece Icon
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFFFF6584).withOpacity(isDark ? 0.25 : 0.15),
+                            const Color(0xFFFF8E72).withOpacity(isDark ? 0.25 : 0.15),
+                          ],
+                        ),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFFF6584).withOpacity(0.4), width: 1.2),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.photo_library_rounded, color: Color(0xFFFF6584), size: 26),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'แตะเพื่อเลือกรูปสลิปจากอัลบั้ม',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFF6584),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF6584).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'เร็วทันใจ ⚡',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFFF6584)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'เปิดแกลเลอรีทันที • AI อ่านยอดเงิน & เลือกหมวดให้อัตโนมัติ',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // 3 Interactive Playful Feature Badges ("ลูกเล่น")
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildFeatureChip(icon: Icons.flash_on_rounded, label: 'อ่านใน 1 วิ', theme: theme),
+                        const SizedBox(width: 6),
+                        _buildFeatureChip(icon: Icons.account_balance_rounded, label: 'สลิปทุกธนาคาร', theme: theme),
+                        const SizedBox(width: 6),
+                        _buildFeatureChip(icon: Icons.auto_fix_high_rounded, label: 'กรอกยอดออโต้', theme: theme),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ]
+
+          // State 3: Slip(s) Attached -> Showcase Reel & AI Status Ribbon
+          else ...[
             SizedBox(
-              height: 72,
+              height: 84,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _receiptImagesList.length + 1,
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
                 itemBuilder: (context, i) {
                   if (i == _receiptImagesList.length) {
-                    // Quick add another slip button
+                    // Quick add another slip directly from gallery!
                     return InkWell(
-                      onTap: _showImagePickerOptions,
-                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => _pickImage(ImageSource.gallery),
+                      borderRadius: BorderRadius.circular(14),
                       child: Container(
-                        width: 64,
-                        height: 64,
+                        width: 74,
+                        height: 74,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: theme.colorScheme.outlineVariant, style: BorderStyle.solid),
+                          color: isDark ? const Color(0xFF1E1724) : Colors.white.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: AppColors.primary.withOpacity(0.35),
+                            width: 1.2,
+                          ),
                         ),
-                        child: Column(
+                        child: const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_photo_alternate_rounded, size: 20, color: theme.colorScheme.primary.withOpacity(0.7)),
-                            const SizedBox(height: 2),
+                            Icon(Icons.add_photo_alternate_rounded, size: 22, color: AppColors.primary),
+                            SizedBox(height: 4),
                             Text(
-                              '+ เพิ่มรูป',
-                              style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurface.withOpacity(0.6), fontWeight: FontWeight.bold),
+                              '+ เพิ่มสลิป',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
                             ),
                           ],
                         ),
@@ -1700,28 +1796,53 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                       GestureDetector(
                         onTap: () => _showImagePreviewDialog(imgStr),
                         child: Container(
-                          width: 64,
-                          height: 64,
+                          width: 74,
+                          height: 74,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.primary.withOpacity(0.35), width: 1.5),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.primary.withOpacity(0.4), width: 1.8),
                             boxShadow: [
-                              BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2)),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
                             ],
                           ),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: imgStr.startsWith('data:image')
-                                ? Image.memory(base64Decode(imgStr.split(',').last), fit: BoxFit.cover)
-                                : (imgStr.startsWith('http')
-                                    ? Image.network(imgStr, fit: BoxFit.cover)
-                                    : Image.file(File(imgStr), fit: BoxFit.cover)),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                imgStr.startsWith('data:image')
+                                    ? Image.memory(base64Decode(imgStr.split(',').last), fit: BoxFit.cover)
+                                    : (imgStr.startsWith('http')
+                                        ? Image.network(imgStr, fit: BoxFit.cover)
+                                        : Image.file(File(imgStr), fit: BoxFit.cover)),
+                                // Bottom badge
+                                Positioned(
+                                  bottom: 0,
+                                  left: 0,
+                                  right: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 2),
+                                    color: Colors.black.withOpacity(0.6),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      'สลิป #${i + 1}',
+                                      style: const TextStyle(fontSize: 8.5, color: Colors.white, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
+                      // Delete button
                       Positioned(
-                        top: -5,
-                        right: -5,
+                        top: -6,
+                        right: -6,
                         child: GestureDetector(
                           onTap: () => setState(() {
                             _receiptImagesList.removeAt(i);
@@ -1734,27 +1855,13 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                             }
                           }),
                           child: Container(
-                            padding: const EdgeInsets.all(2.5),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: AppColors.expense,
                               shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
                             ),
                             child: const Icon(Icons.close, size: 11, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 4,
-                        left: 4,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.65),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'สลิป ${i + 1}',
-                            style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ),
@@ -1763,18 +1870,85 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                 },
               ),
             ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.check_circle_outline, size: 12, color: Colors.green),
-                const SizedBox(width: 4),
-                Text(
-                  'อ่านสลิปแล้ว ยอดเงินและหมวดหมู่ถูกกรอกด้านล่างเรียบร้อย',
-                  style: TextStyle(fontSize: 10.5, color: Colors.green.shade800, fontWeight: FontWeight.w600),
-                ),
-              ],
+            const SizedBox(height: 10),
+            // AI Status Ribbon with interactive "เปลี่ยนรูป" button
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E2130) : Colors.white.withOpacity(0.75),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF4ADE80).withOpacity(0.35)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Color(0xFF4ADE80), size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _amountController.text.isNotEmpty
+                          ? 'AI สแกนอ่านยอด ฿${_amountController.text} เรียบร้อย ✨'
+                          : 'แนบสลิปเรียบร้อย พร้อมบันทึก ✨',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF1B5E20),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => _pickImage(ImageSource.gallery),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.refresh_rounded, size: 12, color: AppColors.primary),
+                          SizedBox(width: 3),
+                          Text(
+                            'เปลี่ยนรูป',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureChip({required IconData icon, required String label, required ThemeData theme}) {
+    final isDark = theme.brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2B2233) : const Color(0xFFFFEFF2),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFF6584).withOpacity(0.25), width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: const Color(0xFFFF6584)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.bold,
+              color: isDark ? const Color(0xFFFF94A8) : const Color(0xFFD81B60),
+            ),
+          ),
         ],
       ),
     );
