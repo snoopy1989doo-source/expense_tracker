@@ -326,9 +326,9 @@ class DashboardScreen extends ConsumerWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFF6584).withOpacity(0.08),
+                            color: const Color(0xFFFF6584).withOpacity(theme.brightness == Brightness.dark ? 0.16 : 0.08),
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFFF6584).withOpacity(0.2)),
+                            border: Border.all(color: const Color(0xFFFF6584).withOpacity(theme.brightness == Brightness.dark ? 0.35 : 0.2)),
                           ),
                           child: const Column(
                             mainAxisSize: MainAxisSize.min,
@@ -351,16 +351,16 @@ class DashboardScreen extends ConsumerWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.purple.shade50,
+                            color: theme.brightness == Brightness.dark ? Colors.purple.withOpacity(0.18) : Colors.purple.shade50,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: Colors.purple.shade200),
+                            border: Border.all(color: theme.brightness == Brightness.dark ? Colors.purple.withOpacity(0.35) : Colors.purple.shade200),
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.auto_awesome, size: 18, color: Colors.purple.shade700),
+                              Icon(Icons.auto_awesome, size: 18, color: theme.brightness == Brightness.dark ? const Color(0xFFD8B4FE) : Colors.purple.shade700),
                               const SizedBox(height: 4),
-                              Text('ถาม AI 🤖', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.purple.shade700)),
+                              Text('ถาม AI 🤖', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.brightness == Brightness.dark ? const Color(0xFFD8B4FE) : Colors.purple.shade700)),
                             ],
                           ),
                         ),
@@ -376,16 +376,16 @@ class DashboardScreen extends ConsumerWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
+                            color: theme.brightness == Brightness.dark ? Colors.orange.withOpacity(0.18) : Colors.orange.shade50,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: Colors.orange.shade200),
+                            border: Border.all(color: theme.brightness == Brightness.dark ? Colors.orange.withOpacity(0.35) : Colors.orange.shade200),
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.casino, size: 18, color: Colors.orange.shade800),
+                              Icon(Icons.casino, size: 18, color: theme.brightness == Brightness.dark ? const Color(0xFFFDBA74) : Colors.orange.shade800),
                               const SizedBox(height: 4),
-                              Text('กินอะไรดี? 🎰', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange.shade800)),
+                              Text('กินอะไรดี? 🎰', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.brightness == Brightness.dark ? const Color(0xFFFDBA74) : Colors.orange.shade800)),
                             ],
                           ),
                         ),
@@ -401,16 +401,16 @@ class DashboardScreen extends ConsumerWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.pink.shade50,
+                            color: theme.brightness == Brightness.dark ? Colors.pink.withOpacity(0.18) : Colors.pink.shade50,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: Colors.pink.shade200),
+                            border: Border.all(color: theme.brightness == Brightness.dark ? Colors.pink.withOpacity(0.35) : Colors.pink.shade200),
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.calendar_month, size: 18, color: Colors.pink.shade700),
+                              Icon(Icons.calendar_month, size: 18, color: theme.brightness == Brightness.dark ? const Color(0xFFF472B6) : Colors.pink.shade700),
                               const SizedBox(height: 4),
-                              Text('ปฏิทินรัก 📅', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.pink.shade700)),
+                              Text('ปฏิทินรัก 📅', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.brightness == Brightness.dark ? const Color(0xFFF472B6) : Colors.pink.shade700)),
                             ],
                           ),
                         ),
@@ -479,7 +479,7 @@ class DashboardScreen extends ConsumerWidget {
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFF6584).withOpacity(0.1),
+                                    color: const Color(0xFFFF6584).withOpacity(theme.brightness == Brightness.dark ? 0.22 : 0.1),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Text('+ สร้างเป้าหมาย ✨', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFFF6584))),
@@ -497,7 +497,7 @@ class DashboardScreen extends ConsumerWidget {
                                 borderRadius: BorderRadius.circular(4),
                                 child: LinearProgressIndicator(
                                   value: (activeGoals.first.progressPercentage / 100).clamp(0.0, 1.0),
-                                  backgroundColor: Colors.grey.shade200,
+                                  backgroundColor: theme.brightness == Brightness.dark ? Colors.white12 : Colors.grey.shade200,
                                   color: const Color(0xFF48BB78),
                                   minHeight: 5,
                                 ),
@@ -538,7 +538,7 @@ class DashboardScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: 8),
                             if (subBudgets.isEmpty) ...[
-                              Text('ยังไม่ตั้งงบหมวดย่อย', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                              Text('ยังไม่ตั้งงบหมวดย่อย', style: TextStyle(fontSize: 11, color: theme.brightness == Brightness.dark ? Colors.white60 : Colors.grey.shade600)),
                               const SizedBox(height: 6),
                               InkWell(
                                 onTap: () {
@@ -555,7 +555,7 @@ class DashboardScreen extends ConsumerWidget {
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                                   decoration: BoxDecoration(
-                                    color: Colors.blue.withOpacity(0.1),
+                                    color: Colors.blue.withOpacity(theme.brightness == Brightness.dark ? 0.22 : 0.1),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Text('+ ตั้งงบพิเศษ 🎯', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
@@ -692,12 +692,13 @@ class DashboardScreen extends ConsumerWidget {
     final predictions = AIFinanceService.predictUpcomingExpenses(transactions);
     final topPrediction = predictions.first;
 
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withOpacity(0.25),
+        color: isDark ? const Color(0xFF221D2E) : theme.colorScheme.primaryContainer.withOpacity(0.25),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
+        border: Border.all(color: isDark ? Colors.purple.withOpacity(0.35) : theme.colorScheme.primary.withOpacity(0.2)),
       ),
       child: Row(
         children: [

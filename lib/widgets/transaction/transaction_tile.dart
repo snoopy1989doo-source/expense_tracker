@@ -33,7 +33,10 @@ class TransactionTile extends ConsumerWidget {
     final theme = Theme.of(context);
     final userProfile = ref.watch(userProfileProvider).value;
     final isIncome = transaction.type == 'income';
-    final amountColor = isIncome ? AppColors.income : AppColors.expense;
+    final isDark = theme.brightness == Brightness.dark;
+    final amountColor = isIncome
+        ? (isDark ? AppColors.incomeDark : AppColors.income)
+        : (isDark ? AppColors.expenseDark : AppColors.expense);
     final catColor = AppColors.fromHex(mainCategory?.color ?? '#9E9E9E');
 
     final displayCreatorName = (userProfile != null && transaction.createdByUserId == userProfile.id && userProfile.nickname.isNotEmpty)

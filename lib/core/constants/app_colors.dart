@@ -24,13 +24,18 @@ class AppColors {
   static const Color textSecondaryLight = Color(0xFF757575);
   static const Color dividerLight = Color(0xFFEEEEEE);
 
-  // Neutral / Background Dark
-  static const Color backgroundDark = Color(0xFF121212);
-  static const Color surfaceDark = Color(0xFF1E1E1E);
-  static const Color cardDark = Color(0xFF242424);
-  static const Color textPrimaryDark = Color(0xFFF5F5F5);
-  static const Color textSecondaryDark = Color(0xFFB0B0B0);
-  static const Color dividerDark = Color(0xFF2C2C2C);
+  // Neutral / Background Dark (Modern Midnight Luxury)
+  static const Color backgroundDark = Color(0xFF0F111A);
+  static const Color surfaceDark = Color(0xFF181A26);
+  static const Color cardDark = Color(0xFF1E2130);
+  static const Color textPrimaryDark = Color(0xFFF1F3F9);
+  static const Color textSecondaryDark = Color(0xFF8E93A6);
+  static const Color dividerDark = Color(0xFF2B2E42);
+
+  // Radiant Financial & Couple Colors for Dark Mode
+  static const Color incomeDark = Color(0xFF4ADE80);
+  static const Color expenseDark = Color(0xFFFF6B81);
+  static const Color primaryDarkBrand = Color(0xFFFF6584);
 
   // Predefined Category Colors (for quick selection)
   static const List<Color> categoryPalette = [

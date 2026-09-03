@@ -1001,14 +1001,18 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                               child: Container(
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
-                                  color: !_isIncome ? AppColors.expense.withOpacity(0.12) : Colors.transparent,
+                                  color: !_isIncome
+                                      ? (theme.brightness == Brightness.dark ? AppColors.expenseDark.withOpacity(0.22) : AppColors.expense.withOpacity(0.12))
+                                      : Colors.transparent,
                                   borderRadius: const BorderRadius.only(topLeft: Radius.circular(11), bottomLeft: Radius.circular(11)),
                                 ),
                                 child: Text(
                                   'รายจ่าย',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: !_isIncome ? AppColors.expense : theme.colorScheme.onSurface.withOpacity(0.6),
+                                    color: !_isIncome
+                                        ? (theme.brightness == Brightness.dark ? AppColors.expenseDark : AppColors.expense)
+                                        : theme.colorScheme.onSurface.withOpacity(0.6),
                                   ),
                                 ),
                               ),
@@ -1027,14 +1031,18 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                               child: Container(
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
-                                  color: _isIncome ? AppColors.income.withOpacity(0.12) : Colors.transparent,
+                                  color: _isIncome
+                                      ? (theme.brightness == Brightness.dark ? AppColors.incomeDark.withOpacity(0.22) : AppColors.income.withOpacity(0.12))
+                                      : Colors.transparent,
                                   borderRadius: const BorderRadius.only(topRight: Radius.circular(11), bottomRight: Radius.circular(11)),
                                 ),
                                 child: Text(
                                   'รายรับ',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: _isIncome ? AppColors.income : theme.colorScheme.onSurface.withOpacity(0.6),
+                                    color: _isIncome
+                                        ? (theme.brightness == Brightness.dark ? AppColors.incomeDark : AppColors.income)
+                                        : theme.colorScheme.onSurface.withOpacity(0.6),
                                   ),
                                 ),
                               ),

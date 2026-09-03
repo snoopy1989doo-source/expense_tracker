@@ -98,6 +98,12 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
+              width: 0.8,
+            ),
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.06),
@@ -160,6 +166,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   }) {
     final isSelected = _currentIndex == index;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     const activeColor = Color(0xFFFF6584);
 
     return InkWell(
@@ -169,7 +176,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? activeColor.withOpacity(0.12) : Colors.transparent,
+          color: isSelected ? activeColor.withOpacity(isDark ? 0.22 : 0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -178,7 +185,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             Icon(
               isSelected ? selectedIcon : unselectedIcon,
               size: 22,
-              color: isSelected ? activeColor : theme.colorScheme.onSurface.withOpacity(0.45),
+              color: isSelected ? activeColor : theme.colorScheme.onSurface.withOpacity(isDark ? 0.45 : 0.45),
             ),
             const SizedBox(height: 3),
             Text(
@@ -186,7 +193,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? activeColor : theme.colorScheme.onSurface.withOpacity(0.6),
+                color: isSelected ? activeColor : theme.colorScheme.onSurface.withOpacity(isDark ? 0.7 : 0.6),
               ),
             ),
           ],

@@ -410,14 +410,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  AppColors.primary.withOpacity(0.14),
-                  Colors.purple.withOpacity(0.06),
-                  theme.colorScheme.surface,
-                ],
+                colors: isDark
+                    ? [
+                        const Color(0xFF2E1C2B),
+                        const Color(0xFF221A30),
+                        theme.colorScheme.surface,
+                      ]
+                    : [
+                        AppColors.primary.withOpacity(0.14),
+                        Colors.purple.withOpacity(0.06),
+                        theme.colorScheme.surface,
+                      ],
               ),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.primary.withOpacity(0.25), width: 1.2),
+              border: Border.all(color: AppColors.primary.withOpacity(isDark ? 0.4 : 0.25), width: 1.2),
               boxShadow: [
                 BoxShadow(
                   color: AppColors.primary.withOpacity(0.06),
@@ -460,7 +466,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.8),
+                            color: isDark ? const Color(0xFF2B2E42) : Colors.white.withOpacity(0.8),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                           ),
@@ -889,6 +895,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     Color? titleColor,
   }) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final effectiveIconBg = isDark ? iconColor.withOpacity(0.20) : iconBgColor;
+    final effectiveIconColor = isDark ? Color.lerp(iconColor, Colors.white, 0.25)! : iconColor;
+
     return Column(
       children: [
         InkWell(
@@ -901,10 +911,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: iconBgColor,
+                    color: effectiveIconBg,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, color: iconColor, size: 18),
+                  child: Icon(icon, color: effectiveIconColor, size: 18),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
