@@ -134,7 +134,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               : null),
                       child: (tempImageBytes == null && (tempBase64Str == null || !tempBase64Str!.startsWith('http')))
                           ? Text(
-                              userProfile?.nickname?.isNotEmpty == true ? userProfile!.nickname.substring(0, 1) : '👤',
+                              userProfile?.nickname.isNotEmpty == true ? userProfile!.nickname.substring(0, 1) : '👤',
                               style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 28),
                             )
                           : null,

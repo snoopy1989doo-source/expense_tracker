@@ -160,7 +160,7 @@ class RawTransactionsNotifier extends StateNotifier<List<TransactionItem>> {
 
   void _init() {
     if (_roomId == null) return;
-    _subscription = _repository.watchTransactions(_roomId!).listen((list) {
+    _subscription = _repository.watchTransactions(_roomId).listen((list) {
       state = list;
     });
   }

@@ -53,13 +53,11 @@ class _WalletManagementScreenState extends ConsumerState<WalletManagementScreen>
     _dialogColor = existing != null ? AppColors.fromHex(existing.color) : AppColors.categoryPalette.first;
     _selectedIcon = existing?.icon ?? 'account_balance_wallet';
 
-    bool isEditingStarting = true;
-
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final startVal = double.tryParse(startBalController.text.trim()) ?? 0.0;
+          final startVal = double.tryParse(startBalController.text.trim().replaceAll(',', '')) ?? 0.0;
           final previewCurrent = startVal + accumulatedTx;
 
           return AlertDialog(
@@ -90,7 +88,7 @@ class _WalletManagementScreenState extends ConsumerState<WalletManagementScreen>
                     ),
                     onChanged: (val) {
                       setDialogState(() {
-                        final s = double.tryParse(val.trim()) ?? 0.0;
+                        final s = double.tryParse(val.trim().replaceAll(',', '')) ?? 0.0;
                         curBalController.text = (s + accumulatedTx).toStringAsFixed(2);
                       });
                     },
@@ -102,7 +100,7 @@ class _WalletManagementScreenState extends ConsumerState<WalletManagementScreen>
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                       ),
@@ -114,7 +112,7 @@ class _WalletManagementScreenState extends ConsumerState<WalletManagementScreen>
                             children: [
                               const Text('• ธุรกรรมสะสมในแอป:', style: TextStyle(fontSize: 11, color: Colors.grey)),
                               Text(
-                                '${accumulatedTx >= 0 ? "+${CurrencyFormatter.format(accumulatedTx)}" : CurrencyFormatter.format(accumulatedTx)}',
+                                accumulatedTx >= 0 ? "+${CurrencyFormatter.format(accumulatedTx)}" : CurrencyFormatter.format(accumulatedTx),
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,

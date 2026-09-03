@@ -120,7 +120,7 @@ class DashboardScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'สวัสดีครับ 👋',
+                              partnerProfile != null ? 'กระเป๋าคู่รัก 💕' : 'สวัสดีครับ 👋',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: theme.colorScheme.onSurface.withOpacity(0.55),
@@ -128,7 +128,7 @@ class DashboardScreen extends ConsumerWidget {
                               ),
                             ),
                             Text(
-                              userName,
+                              partnerProfile != null ? '$userName & $partnerName' : userName,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,

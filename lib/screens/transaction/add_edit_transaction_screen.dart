@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
-import 'dart:js_util' as js_util;
 import 'package:http/http.dart' as http;
+import '../../services/slip_ocr_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -43,7 +43,6 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   bool _isTaxDeductible = false;
   
   File? _selectedImageFile;
-  Uint8List? _selectedImageBytes;
   String? _existingImageUrl;
   final List<String> _receiptImagesList = []; // Multi-image support
   bool _isScanningSlip = false; // Scanning animation state
@@ -73,11 +72,6 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       _existingImageUrl = tx.receiptImageUrl;
       if (_existingImageUrl != null && _existingImageUrl!.isNotEmpty) {
         _receiptImagesList.add(_existingImageUrl!);
-      }
-      if (_existingImageUrl != null && _existingImageUrl!.startsWith('data:image')) {
-        try {
-          _selectedImageBytes = base64Decode(_existingImageUrl!.split(',').last);
-        } catch (_) {}
       }
     }
   }
@@ -138,7 +132,6 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
         final base64Str = 'data:image/jpeg;base64,${base64Encode(bytes)}';
         setState(() {
           _selectedImageFile = File(pickedFile.path);
-          _selectedImageBytes = bytes;
           _existingImageUrl = base64Str;
           if (!_receiptImagesList.contains(base64Str)) {
             _receiptImagesList.add(base64Str);
@@ -206,13 +199,9 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     // Step 2: Fallback to JS Pipeline (Local PromptParse + jsQR + Tesseract)
     if (extractedText.isEmpty) {
       try {
-        if (js_util.hasProperty(js_util.globalThis, 'parseSlipOCR')) {
-          final promise = js_util.callMethod(js_util.globalThis, 'parseSlipOCR', [base64Str]);
-          final result = await js_util.promiseToFuture(promise);
-          extractedText = result.toString();
-        }
+        extractedText = await SlipOCRService.runLocalSlipOCR(base64Str);
       } catch (e) {
-        debugPrint('JS OCR Fallback Notice: $e');
+        debugPrint('Local OCR Fallback Notice: $e');
       }
     }
 
@@ -363,7 +352,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     if (mounted) {
       double? finalTotalAmount;
       if (matchedAmount != null) {
-        final currentVal = double.tryParse(_amountController.text.trim()) ?? 0.0;
+        final currentVal = double.tryParse(_amountController.text.trim().replaceAll(',', '')) ?? 0.0;
         // If more than 1 slip attached, accumulate total!
         if (_receiptImagesList.length > 1 && currentVal > 0) {
           finalTotalAmount = currentVal + matchedAmount;
@@ -531,7 +520,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   }
 
   double _evaluateExpression(String expr) {
-    expr = expr.replaceAll(' ', '');
+    expr = expr.replaceAll(' ', '').replaceAll(',', '');
     final parts = expr.split(RegExp(r'(?<=[+-])|(?=[+-])'));
     double total = 0;
     String currentOp = '+';
@@ -592,7 +581,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
         ? subCats.firstWhere((s) => s.mainCategoryId == tempMainCatId, orElse: () => subCats.first).id
         : null;
 
-    final totalBill = double.tryParse(_amountController.text.trim()) ?? 0.0;
+    final totalBill = double.tryParse(_amountController.text.trim().replaceAll(',', '')) ?? 0.0;
     final allocatedSum = _splitItems.fold<double>(0.0, (s, item) => s + (item['amount'] as double));
     final remaining = totalBill - allocatedSum;
 
@@ -688,7 +677,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
               ElevatedButton(
                 onPressed: () {
                   final name = nameController.text.trim();
-                  final amt = double.tryParse(amountController.text.trim()) ?? 0;
+                  final amt = double.tryParse(amountController.text.trim().replaceAll(',', '')) ?? 0;
                   if (name.isNotEmpty && amt > 0 && tempMainCatId != null && tempSubCatId != null) {
                     setState(() {
                       _splitItems.add({
@@ -714,10 +703,6 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
         },
       ),
     );
-  }
-
-  void _showImagePickerOptions() {
-    _pickImage(ImageSource.gallery);
   }
 
   Future<void> _selectDate() async {
@@ -784,7 +769,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       final storageRepo = ref.read(storageRepositoryProvider);
 
       if (_isSplitBill && _splitItems.isNotEmpty) {
-        final totalBill = double.tryParse(_amountController.text.trim()) ?? 0.0;
+        final totalBill = double.tryParse(_amountController.text.trim().replaceAll(',', '')) ?? 0.0;
         final allocatedSum = _splitItems.fold<double>(0.0, (s, item) => s + (item['amount'] as double));
         final remaining = totalBill - allocatedSum;
 
@@ -840,7 +825,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
         }
       } else {
         // Single transaction submission
-        final amount = double.parse(_amountController.text.trim());
+        final amount = double.parse(_amountController.text.trim().replaceAll(',', ''));
         final transactionId = isNew ? const Uuid().v4() : widget.transaction!.id;
 
         final transaction = TransactionItem(
@@ -884,7 +869,9 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
         Navigator.of(context).pop();
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('บันทึกไม่สำเร็จ: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('บันทึกไม่สำเร็จ: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -903,7 +890,9 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
           await ref.read(rawTransactionsProvider.notifier).deleteTransaction(widget.transaction!.id);
           if (mounted) Navigator.of(context).pop();
         } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ลบรายการไม่สำเร็จ: $e')));
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ลบรายการไม่สำเร็จ: $e')));
+          }
         } finally {
           if (mounted) setState(() => _isSaving = false);
         }
@@ -1062,7 +1051,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                       validator: (val) {
                         if (val == null || val.trim().isEmpty) return 'กรุณากรอกจำนวนเงิน';
                         try {
-                          final exp = val.replaceAll('×', '*').replaceAll('÷', '/');
+                          final exp = val.replaceAll(',', '').replaceAll('×', '*').replaceAll('÷', '/');
                           final num = _evaluateExpression(exp);
                           if (num <= 0) return 'จำนวนเงินต้องมากกว่า 0';
                         } catch (_) {
@@ -1097,7 +1086,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                     if (_isSplitBill) ...[
                       Builder(
                         builder: (context) {
-                          final totalBill = double.tryParse(_amountController.text.trim()) ?? 0.0;
+                          final totalBill = double.tryParse(_amountController.text.trim().replaceAll(',', '')) ?? 0.0;
                           final allocatedSum = _splitItems.fold<double>(0.0, (s, item) => s + (item['amount'] as double));
                           final remaining = totalBill - allocatedSum;
 
@@ -1122,7 +1111,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                                 Container(
                                   padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                                   decoration: BoxDecoration(
-                                    color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+                                    color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.35),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Row(
@@ -1848,7 +1837,6 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                             _receiptImagesList.removeAt(i);
                             if (_receiptImagesList.isEmpty) {
                               _selectedImageFile = null;
-                              _selectedImageBytes = null;
                               _existingImageUrl = null;
                             } else {
                               _existingImageUrl = _receiptImagesList.last;

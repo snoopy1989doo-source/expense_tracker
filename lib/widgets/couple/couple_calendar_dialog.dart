@@ -29,7 +29,6 @@ class _CoupleCalendarDialogState extends ConsumerState<CoupleCalendarDialog> {
   Widget build(BuildContext context) {
     final transactions = ref.watch(rawTransactionsProvider);
     final mainCats = ref.watch(mainCategoriesProvider);
-    final subCats = ref.watch(subCategoriesProvider);
     final theme = Theme.of(context);
 
     // Map transactions by YYYY-MM-DD

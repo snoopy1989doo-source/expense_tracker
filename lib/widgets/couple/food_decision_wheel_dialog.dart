@@ -132,10 +132,6 @@ class _FoodDecisionWheelDialogState extends ConsumerState<FoodDecisionWheelDialo
       builder: (ctx) => StatefulBuilder(
         builder: (context, setSheetState) {
           final coupleRoom = ref.watch(coupleRoomProvider).value;
-          final currentCustom = [
-            ..._localCustomMenu,
-            if (coupleRoom != null) ...coupleRoom.customFoodMenu,
-          ];
 
           return Container(
             height: MediaQuery.of(context).size.height * 0.75,

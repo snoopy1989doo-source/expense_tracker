@@ -191,7 +191,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
     final partnerPhoto = partnerProfile?.photoBase64;
 
-    Future<void> _exportCsv() async {
+    Future<void> exportCsv() async {
       try {
         final filename = 'รายงานการเงิน_${filters.selectedMonth.year}_${filters.selectedMonth.month}';
         await CsvExporter.shareCsv(
@@ -362,7 +362,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           IconButton(
             icon: const Icon(Icons.share_outlined, color: _softStrawberry, size: 20),
             tooltip: 'ส่งออก CSV รายงานการเงิน',
-            onPressed: transactions.isEmpty ? null : _exportCsv,
+            onPressed: transactions.isEmpty ? null : exportCsv,
           ),
           const SizedBox(width: 6),
         ],

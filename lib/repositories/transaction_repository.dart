@@ -139,7 +139,7 @@ class FirestoreTransactionRepository implements TransactionRepository {
           .where('createdByUserId', isEqualTo: userId)
           .get();
 
-      final batch = _firestore!.batch();
+      final batch = _firestore.batch();
       for (var doc in snap.docs) {
         batch.update(doc.reference, {'createdByName': newName});
       }

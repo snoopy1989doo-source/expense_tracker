@@ -539,7 +539,7 @@ class AIFinanceService {
       double catExpense = 0;
       for (var t in expenses) {
         final note = t.note?.toLowerCase() ?? '';
-        final subName = subCatMap[t.subCategoryId ?? '']?.name.toLowerCase() ?? '';
+        final subName = subCatMap[t.subCategoryId]?.name.toLowerCase() ?? '';
         if (note.contains('แมว') || note.contains('กังฟู') || note.contains('โอเลี้ยง') || note.contains('ทราย') || note.contains('อาหารแมว') || subName.contains('แมว')) {
           catExpense += t.amount;
         }
