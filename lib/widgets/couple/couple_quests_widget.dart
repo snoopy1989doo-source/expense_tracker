@@ -876,33 +876,23 @@ class _CoupleQuestsWidgetState extends ConsumerState<CoupleQuestsWidget> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Text(
-                              'ต๋อง & ฝน',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'คบกันมาแล้ว $daysTogether วัน 💕',
-                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
                         const Text(
-                          'ครบรอบ 17 ม.ค. | วันเกิดฝน 15 ม.ค. | กังฟู & โอเลี้ยง 🐱🐾',
-                          style: TextStyle(fontSize: 10, color: Colors.brown),
+                          'ต๋อง & ฝน',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'คบกันมาแล้ว $daysTogether วัน 💕',
+                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ],
                     ),

@@ -186,7 +186,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     } else if (partnerEmail.isNotEmpty) {
       partnerName = partnerEmail.split('@').first;
     } else {
-      partnerName = 'แฟน (รอเชื่อมต่อ)';
+      partnerName = 'แฟน';
     }
 
     final partnerPhoto = partnerProfile?.photoBase64;
@@ -566,13 +566,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   children: [
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.people, color: _softStrawberry, size: 20),
-                        const SizedBox(width: 8),
+                      children: const [
+                        Icon(Icons.people, color: _softStrawberry, size: 20),
+                        SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '$userName & $partnerName เปย์ร่วมกันเดือนนี้',
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            'สัดส่วนการใช้จ่ายของคู่เรา',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],

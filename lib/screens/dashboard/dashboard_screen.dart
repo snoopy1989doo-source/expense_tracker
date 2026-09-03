@@ -85,7 +85,7 @@ class DashboardScreen extends ConsumerWidget {
     } else if (partnerEmail.isNotEmpty) {
       partnerName = partnerEmail.split('@').first;
     } else {
-      partnerName = 'แฟน (รอเชื่อมต่อ)';
+      partnerName = 'แฟน';
     }
 
     final goals = goalsAsync.value ?? [];
