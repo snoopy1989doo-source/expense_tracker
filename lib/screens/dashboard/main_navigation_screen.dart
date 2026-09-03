@@ -116,15 +116,15 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
                 _buildNavItem(
                   context: context,
                   index: 0,
-                  unselectedIcon: Icons.space_dashboard_outlined,
-                  selectedIcon: Icons.space_dashboard_rounded,
+                  unselectedIcon: Icons.dashboard_outlined,
+                  selectedIcon: Icons.dashboard,
                   label: 'ภาพรวม',
                 ),
                 _buildNavItem(
                   context: context,
                   index: 1,
                   unselectedIcon: Icons.receipt_long_outlined,
-                  selectedIcon: Icons.receipt_long_rounded,
+                  selectedIcon: Icons.receipt_long,
                   label: 'รายการ',
                 ),
                 // Center Elevated Glowing Button
@@ -132,15 +132,15 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
                 _buildNavItem(
                   context: context,
                   index: 2,
-                  unselectedIcon: Icons.pie_chart_outline_rounded,
-                  selectedIcon: Icons.pie_chart_rounded,
+                  unselectedIcon: Icons.pie_chart_outline,
+                  selectedIcon: Icons.pie_chart,
                   label: 'รายงาน',
                 ),
                 _buildNavItem(
                   context: context,
                   index: 3,
                   unselectedIcon: Icons.settings_outlined,
-                  selectedIcon: Icons.settings_rounded,
+                  selectedIcon: Icons.settings,
                   label: 'ตั้งค่า',
                 ),
               ],
@@ -224,10 +224,12 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             ),
           ],
         ),
-        child: const Icon(
-          Icons.add_rounded,
-          color: Colors.white,
-          size: 30,
+        child: const Center(
+          child: Icon(
+            Icons.add,
+            color: Colors.white,
+            size: 30,
+          ),
         ),
       ),
     );
