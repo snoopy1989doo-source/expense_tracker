@@ -957,6 +957,11 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       appBar: AppBar(
         title: Text(widget.transaction == null ? 'เพิ่มรายการใหม่' : 'แก้ไขรายการ'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.check_circle, color: AppColors.primary, size: 28),
+            tooltip: 'บันทึกรายการ',
+            onPressed: _isSaving ? null : _submit,
+          ),
           if (widget.transaction != null)
             IconButton(
               icon: const Icon(Icons.delete, color: AppColors.expense),
@@ -969,7 +974,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
           : Form(
               key: _formKey,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20.0),
+                padding: const EdgeInsets.fromLTRB(20.0, 20.0, 20.0, 40.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -1573,17 +1578,31 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
                         ),
                       ],
                     ),
-                    const SizedBox(height: 32),
-
-                    // Submit Button
-                    CustomButton(
-                      text: 'บันทึกรายการ',
-                      onPressed: _submit,
-                    ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 10,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: CustomButton(
+            text: widget.transaction == null ? 'บันทึกรายการ 💾' : 'บันทึกการแก้ไข 💾',
+            isLoading: _isSaving,
+            onPressed: _submit,
+          ),
+        ),
+      ),
     );
   }
 }
