@@ -1,10 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/wallet_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/report_provider.dart';
-import '../../widgets/common/stat_card.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/couple_provider.dart';
+import '../../providers/savings_goal_provider.dart';
 import '../../widgets/wallet/wallet_card.dart';
 import '../../widgets/transaction/transaction_tile.dart';
 import '../../widgets/common/empty_state.dart';
@@ -26,19 +29,43 @@ class DashboardScreen extends ConsumerWidget {
 
   const DashboardScreen({super.key, required this.onNavigateToTransactions});
 
+  Widget _buildAvatar(String? photoBase64, String nickname, Color bgColor, {double size = 32}) {
+    if (photoBase64 != null && photoBase64.isNotEmpty) {
+      try {
+        final cleanBase64 = photoBase64.contains(',') ? photoBase64.split(',').last : photoBase64;
+        return CircleAvatar(
+          radius: size / 2,
+          backgroundImage: MemoryImage(base64Decode(cleanBase64)),
+        );
+      } catch (_) {}
+    }
+    return CircleAvatar(
+      radius: size / 2,
+      backgroundColor: bgColor.withOpacity(0.2),
+      child: Text(
+        nickname.isNotEmpty ? nickname.characters.first : '👤',
+        style: TextStyle(fontSize: size * 0.45, fontWeight: FontWeight.bold, color: bgColor),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final wallets = ref.watch(walletsProvider);
-    final recentTransactions = ref.watch(rawTransactionsProvider).take(5).toList();
+    final recentTransactions = ref.watch(rawTransactionsProvider).take(4).toList();
     final report = ref.watch(reportProvider);
     final filters = ref.watch(transactionFiltersProvider);
     final filterNotifier = ref.read(transactionFiltersProvider.notifier);
 
     final mainCats = ref.watch(mainCategoriesProvider);
     final subCats = ref.watch(subCategoriesProvider);
+    final userProfile = ref.watch(userProfileProvider).value;
+    final partnerProfile = ref.watch(partnerProfileProvider).value;
+    final goalsAsync = ref.watch(savingsGoalsStreamProvider);
+    final roomAsync = ref.watch(coupleRoomProvider);
 
     final mainCatMap = {for (var c in mainCats) c.id: c};
-    final subCatMap = {for (var c in subCats) c.id: c};
+    final subCatMap = {for (var s in subCats) s.id: s};
     final walletMap = {for (var w in wallets) w.id: w};
 
     final theme = Theme.of(context);
@@ -46,11 +73,30 @@ class DashboardScreen extends ConsumerWidget {
     // Sum total balance across all wallets
     final totalAssets = wallets.fold<double>(0, (sum, w) => sum + w.currentBalance);
 
+    // User & Partner names
+    final userName = userProfile?.nickname.isNotEmpty == true
+        ? userProfile!.nickname
+        : (userProfile?.email.isNotEmpty == true ? userProfile!.email.split('@').first : 'ฉัน');
+
+    final String partnerName;
+    final partnerEmail = partnerProfile?.email ?? '';
+    if (partnerProfile?.nickname.isNotEmpty == true) {
+      partnerName = partnerProfile!.nickname;
+    } else if (partnerEmail.isNotEmpty) {
+      partnerName = partnerEmail.split('@').first;
+    } else {
+      partnerName = 'แฟน (รอเชื่อมต่อ)';
+    }
+
+    final goals = goalsAsync.value ?? [];
+    final activeGoals = goals.where((g) => !g.isCompleted).toList();
+    final room = roomAsync.value;
+    final subBudgets = room?.subcategoryBudgets ?? {};
+
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            // Trigger refresh on all providers
             ref.read(rawWalletsProvider.notifier).loadWallets();
             ref.read(rawTransactionsProvider.notifier).loadTransactions();
             ref.read(mainCategoriesProvider.notifier).loadCategories();
@@ -58,193 +104,313 @@ class DashboardScreen extends ConsumerWidget {
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header (Greetings & Month selector)
+                // 1. Compact Header: Avatar + Greetings + Month Selector
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Row(
                       children: [
-                        Text(
-                          'สวัสดีครับ',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: theme.colorScheme.onSurface.withOpacity(0.5),
-                          ),
-                        ),
-                        const Text(
-                          'ภาพรวมการเงิน',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        _buildAvatar(userProfile?.photoBase64, userName, AppColors.primary, size: 36),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'สวัสดีครับ 👋',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: theme.colorScheme.onSurface.withOpacity(0.55),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              userName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    // Month controller
+                    // Month Controller Pill
                     Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                       decoration: BoxDecoration(
-                        border: Border.all(color: theme.colorScheme.outlineVariant),
-                        borderRadius: BorderRadius.circular(12),
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.6)),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2)),
+                        ],
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          IconButton(
-                            icon: const Icon(Icons.chevron_left, size: 20),
-                            onPressed: () => filterNotifier.previousMonth(),
+                          InkWell(
+                            onTap: () => filterNotifier.previousMonth(),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(Icons.chevron_left, size: 16),
+                            ),
                           ),
                           Text(
                             DateFormatter.formatSmartMonth(filters.selectedMonth),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.chevron_right, size: 20),
-                            onPressed: () => filterNotifier.nextMonth(),
+                          InkWell(
+                            onTap: () => filterNotifier.nextMonth(),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(Icons.chevron_right, size: 16),
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 14),
 
-                // Asset card (Net Wealth)
+                // 2. Compact All-in-One Financial Hero Card (Net Wealth + Monthly Income & Expense)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [theme.colorScheme.primary, theme.colorScheme.primary.withOpacity(0.85)],
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFFFF6584),
+                        Color(0xFFFF8E72),
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(22),
                     boxShadow: [
                       BoxShadow(
-                        color: theme.colorScheme.primary.withOpacity(0.25),
-                        blurRadius: 12,
+                        color: const Color(0xFFFF6584).withOpacity(0.3),
+                        blurRadius: 14,
                         offset: const Offset(0, 6),
-                      )
+                      ),
                     ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'ยอดเงินคงเหลือรวมทุกบัญชี',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'ยอดเงินคงเหลือรวมทุกบัญชี 💰',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${wallets.length} บัญชี',
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 6),
                       Text(
                         CurrencyFormatter.format(totalAssets),
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 28,
+                          fontSize: 26,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Integrated Dual-Pill for Income & Expense
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          children: [
+                            // Income
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                                    child: const Icon(Icons.arrow_upward, size: 12, color: Color(0xFF2E7D32)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('รายรับเดือนนี้', style: TextStyle(fontSize: 10, color: Colors.white70)),
+                                        Text(
+                                          CurrencyFormatter.format(report.totalIncome),
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(width: 1, height: 28, color: Colors.white.withOpacity(0.3)),
+                            const SizedBox(width: 10),
+                            // Expense
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                                    child: const Icon(Icons.arrow_downward, size: 12, color: Color(0xFFC62828)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('รายจ่ายเดือนนี้', style: TextStyle(fontSize: 10, color: Colors.white70)),
+                                        Text(
+                                          CurrencyFormatter.format(report.totalExpense),
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
 
-                // Income / Expense Stats
+                // 3. Quick Action Grid (4 Clean Minimalist Buttons in One Row)
                 Row(
                   children: [
-                    StatCard(
-                      title: 'รายรับเดือนนี้',
-                      amount: report.totalIncome,
-                      color: AppColors.income,
-                      backgroundColor: AppColors.incomeLight.withOpacity(0.4),
-                      icon: Icons.arrow_upward,
+                    // 1. Scan Slip
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const AddEditTransactionScreen()),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF6584).withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFFF6584).withOpacity(0.2)),
+                          ),
+                          child: const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.qr_code_scanner_rounded, size: 18, color: Color(0xFFFF6584)),
+                              SizedBox(height: 4),
+                              Text('สแกนสลิป', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF6584))),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 14),
-                    StatCard(
-                      title: 'รายจ่ายเดือนนี้',
-                      amount: report.totalExpense,
-                      color: AppColors.expense,
-                      backgroundColor: AppColors.expenseLight.withOpacity(0.4),
-                      icon: Icons.arrow_downward,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
+                    const SizedBox(width: 8),
 
-                // AI Smart Insights & Predictor Card
-                _buildAIPredictorCard(context, ref, ref.watch(rawTransactionsProvider)),
-                const SizedBox(height: 16),
-
-                // Quick Couple Gimmick Buttons Row (AI Chat, Food Decision Wheel, Memory Calendar)
-                Row(
-                  children: [
+                    // 2. Ask AI
                     Expanded(
                       child: InkWell(
                         onTap: () => AIChatDialog.show(context),
+                        borderRadius: BorderRadius.circular(14),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.pink.shade50,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.auto_awesome, color: AppColors.primary, size: 16),
-                              SizedBox(width: 4),
-                              Text('ถาม AI 🤖', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => FoodDecisionWheelDialog.show(context),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: Colors.orange.shade300),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.casino, color: Colors.orange, size: 16),
-                              SizedBox(width: 4),
-                              Text('กินอะไรดี? 🎰', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => CoupleCalendarDialog.show(context),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
                             color: Colors.purple.shade50,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: Colors.purple.shade300),
+                            border: Border.all(color: Colors.purple.shade200),
                           ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.calendar_month, color: Colors.purple, size: 16),
-                              SizedBox(width: 4),
-                              Text('ปฏิทินรัก 📅', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.purple)),
+                              Icon(Icons.auto_awesome, size: 18, color: Colors.purple.shade700),
+                              const SizedBox(height: 4),
+                              Text('ถาม AI 🤖', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.purple.shade700)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // 3. Food Wheel
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => FoodDecisionWheelDialog.show(context),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.orange.shade200),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.casino, size: 18, color: Colors.orange.shade800),
+                              const SizedBox(height: 4),
+                              Text('กินอะไรดี? 🎰', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange.shade800)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // 4. Love Calendar
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => CoupleCalendarDialog.show(context),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.pink.shade50,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.pink.shade200),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.calendar_month, size: 18, color: Colors.pink.shade700),
+                              const SizedBox(height: 4),
+                              Text('ปฏิทินรัก 📅', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.pink.shade700)),
                             ],
                           ),
                         ),
@@ -252,46 +418,198 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
 
-                // Couple Shared Savings Pot Widget (🐷)
-                const CoupleSavingsWidget(),
-                const SizedBox(height: 20),
+                // 4. Compact AI Smart Insights Ribbon
+                _buildCompactAIRibbon(context, ref, ref.watch(rawTransactionsProvider)),
+                const SizedBox(height: 14),
 
-                // Subcategory Budgets Widget (🎯 Option A)
-                const SubcategoryBudgetWidget(),
-                const SizedBox(height: 20),
+                // 5. Couple Life Bento Grid (Savings Pot & Budget Side-by-Side)
+                Row(
+                  children: [
+                    // Bento 1: Couple Savings Goals
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Text('🐷', style: TextStyle(fontSize: 15)),
+                                    SizedBox(width: 4),
+                                    Text('ออมคู่รัก', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                                if (activeGoals.isNotEmpty)
+                                  Text(
+                                    '${activeGoals.first.progressPercentage.toStringAsFixed(0)}%',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF48BB78)),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (activeGoals.isEmpty) ...[
+                              Text('ยังไม่มีเป้าหมาย', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                              const SizedBox(height: 6),
+                              InkWell(
+                                onTap: () {
+                                  // Open savings widget dialog or trigger
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                                    builder: (ctx) => const Padding(
+                                      padding: EdgeInsets.all(16.0),
+                                      child: CoupleSavingsWidget(),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFF6584).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text('+ สร้างเป้าหมาย ✨', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFFF6584))),
+                                ),
+                              ),
+                            ] else ...[
+                              Text(
+                                '${activeGoals.first.emoji} ${activeGoals.first.title}',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: (activeGoals.first.progressPercentage / 100).clamp(0.0, 1.0),
+                                  backgroundColor: Colors.grey.shade200,
+                                  color: const Color(0xFF48BB78),
+                                  minHeight: 5,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
 
-                // Couple Quests & Horoscope Card
+                    // Bento 2: Subcategory Budget
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text('🎯', style: TextStyle(fontSize: 15)),
+                                    SizedBox(width: 4),
+                                    Text('คุมงบหมวด', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (subBudgets.isEmpty) ...[
+                              Text('ยังไม่ตั้งงบหมวดย่อย', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                              const SizedBox(height: 6),
+                              InkWell(
+                                onTap: () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                                    builder: (ctx) => const Padding(
+                                      padding: EdgeInsets.all(16.0),
+                                      child: SubcategoryBudgetWidget(),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text('+ ตั้งงบพิเศษ 🎯', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
+                                ),
+                              ),
+                            ] else ...[
+                              Text(
+                                'คุมงบ ${subBudgets.length} หมวด',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'ดูรายละเอียดงบประมาณ',
+                                style: TextStyle(fontSize: 10, color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // 6. Couple Quest & Daily Love Horoscope Compact Bar
                 const CoupleQuestsWidget(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
-                // Horizontal Wallets List
+                // 7. Horizontal Wallets List
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
                       'กระเป๋าเงิน / บัญชี',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.arrow_forward, size: 20),
-                      onPressed: () {
-                        // We will let the parent screen navigate to Wallets management tab
-                      },
+                      icon: const Icon(Icons.arrow_forward, size: 18),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: onNavigateToTransactions,
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 if (wallets.isEmpty)
                   const Center(child: Text('ไม่มีบัญชีผู้ใช้'))
                 else
                   SizedBox(
-                    height: 120,
+                    height: 110,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: wallets.length,
-                      separatorBuilder: (context, index) => const SizedBox(width: 12),
+                      separatorBuilder: (context, index) => const SizedBox(width: 10),
                       itemBuilder: (context, index) {
                         final wallet = wallets[index];
                         return WalletCard(
@@ -304,27 +622,28 @@ class DashboardScreen extends ConsumerWidget {
                       },
                     ),
                   ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 18),
 
-                // Recent Transactions List
+                // 8. Recent Transactions List
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
                       'ธุรกรรมล่าสุด',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                     ),
                     TextButton(
                       onPressed: onNavigateToTransactions,
-                      child: const Text('ดูทั้งหมด'),
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(50, 30)),
+                      child: const Text('ดูทั้งหมด', style: TextStyle(fontSize: 12)),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 if (recentTransactions.isEmpty)
                   EmptyState(
                     title: 'ยังไม่มีประวัติการบันทึก',
-                    description: 'กดปุ่ม + ด้านล่างเพื่อเริ่มสร้างรายการรายรับหรือรายจ่ายแรกของคุณ',
+                    description: 'กดปุ่ม + ด้านล่างเพื่อเริ่มสร้างรายการแรกของคุณ',
                     onButtonPressed: () {
                       Navigator.push(
                         context,
@@ -338,13 +657,13 @@ class DashboardScreen extends ConsumerWidget {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: recentTransactions.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 4),
+                    separatorBuilder: (context, index) => const SizedBox(height: 2),
                     itemBuilder: (context, index) {
                       final tx = recentTransactions[index];
                       final mainCat = mainCatMap[tx.mainCategoryId];
                       final subCat = subCatMap[tx.subCategoryId];
                       final wallet = walletMap[tx.walletId];
-                      
+
                       return TransactionTile(
                         transaction: tx,
                         mainCategory: mainCat,
@@ -353,15 +672,13 @@ class DashboardScreen extends ConsumerWidget {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) => AddEditTransactionScreen(transaction: tx),
-                            ),
+                            MaterialPageRoute(builder: (context) => AddEditTransactionScreen(transaction: tx)),
                           );
                         },
                       );
                     },
                   ),
-                const SizedBox(height: 80), // Padding to avoid FAB overlay
+                const SizedBox(height: 80),
               ],
             ),
           ),
@@ -379,74 +696,72 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAIPredictorCard(BuildContext context, WidgetRef ref, List<TransactionItem> transactions) {
+  Widget _buildCompactAIRibbon(BuildContext context, WidgetRef ref, List<TransactionItem> transactions) {
     final theme = Theme.of(context);
     final predictions = AIFinanceService.predictUpcomingExpenses(transactions);
     final topPrediction = predictions.first;
 
-    return Card(
-      color: theme.colorScheme.primaryContainer.withOpacity(0.35),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.3)),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withOpacity(0.25),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Row(
+        children: [
+          Text(topPrediction.iconEmoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(topPrediction.iconEmoji, style: const TextStyle(fontSize: 22)),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Text(
-                            'AI Smart Insights',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
-                          ),
-                          const Spacer(),
-                          InkWell(
-                            onTap: () => AIChatDialog.show(context),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.auto_awesome, size: 12, color: Colors.white),
-                                  SizedBox(width: 4),
-                                  Text('ถาม AI', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
+                Row(
+                  children: [
+                    Text(
+                      'AI Insight',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: theme.colorScheme.primary),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
                         topPrediction.title,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
+                Text(
+                  topPrediction.description,
+                  style: TextStyle(fontSize: 10.5, color: theme.colorScheme.onSurface.withOpacity(0.65)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              topPrediction.description,
-              style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withOpacity(0.7)),
+          ),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: () => AIChatDialog.show(context),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_awesome, size: 10, color: Colors.white),
+                  SizedBox(width: 2),
+                  Text('ถาม AI', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

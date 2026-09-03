@@ -171,8 +171,25 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final theme = Theme.of(context);
     final monthName = DateFormatter.formatSmartMonth(filters.selectedMonth);
 
-    final userName = userProfile?.nickname.isNotEmpty == true ? userProfile!.nickname : 'ต๋อง';
-    final partnerName = partnerProfile?.nickname.isNotEmpty == true ? partnerProfile!.nickname : 'คนโปรด';
+    // Dynamic resolution of User & Partner Name & Photo according to user's exact specification:
+    // 1. Check partner's nickname
+    // 2. If partner hasn't set a nickname, pull name from their logged-in account (e.g. email prefix)
+    // 3. If no partner connected yet, show "แฟน (รอเชื่อมต่อ)"
+    final userName = userProfile?.nickname.isNotEmpty == true
+        ? userProfile!.nickname
+        : (userProfile?.email.isNotEmpty == true ? userProfile!.email.split('@').first : 'ฉัน');
+
+    final String partnerName;
+    final partnerEmail = partnerProfile?.email ?? '';
+    if (partnerProfile?.nickname.isNotEmpty == true) {
+      partnerName = partnerProfile!.nickname;
+    } else if (partnerEmail.isNotEmpty) {
+      partnerName = partnerEmail.split('@').first;
+    } else {
+      partnerName = 'แฟน (รอเชื่อมต่อ)';
+    }
+
+    final partnerPhoto = partnerProfile?.photoBase64;
 
     Future<void> _exportCsv() async {
       try {
@@ -234,9 +251,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       return n.contains('อาหาร') || n.contains('cafe') || n.contains('กิน') || n.contains('เดต') || n.contains('date');
     }).length;
 
-    // First savings goal progress
+    // Actual savings goals from stream (Never hardcoded!)
     final goals = goalsAsync.value ?? [];
-    final activeGoal = goals.isNotEmpty ? goals.first : null;
 
     return Scaffold(
       backgroundColor: theme.brightness == Brightness.light ? _pastelCream : null,
@@ -302,7 +318,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           ),
         ),
         actions: [
-          // Dual Avatar Ring with Love Badge
+          // Dual Avatar Ring with Love Badge (User & Partner's actual photo/name)
           Container(
             margin: const EdgeInsets.only(right: 6),
             child: Stack(
@@ -326,7 +342,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
                         ),
-                        child: _buildAvatar(partnerProfile?.photoBase64, partnerName, _warmPeach, size: 28),
+                        child: _buildAvatar(partnerPhoto, partnerName, _warmPeach, size: 28),
                       ),
                     ),
                   ],
@@ -617,10 +633,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // 2 Avatar Sub-cards (Tong & Partner)
+                    // 2 Avatar Sub-cards (User & Partner)
                     Row(
                       children: [
-                        // Card A: User (ต๋อง)
+                        // Card A: User (ฉัน / dooodo)
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.all(12),
@@ -672,7 +688,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                         ),
                         const SizedBox(width: 12),
 
-                        // Card B: Partner (ฝน)
+                        // Card B: Partner (ฝน หรือชื่อจากบัญชีล็อกอิน)
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.all(12),
@@ -686,7 +702,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                               children: [
                                 Row(
                                   children: [
-                                    _buildAvatar(partnerProfile?.photoBase64, partnerName, _warmPeach, size: 24),
+                                    _buildAvatar(partnerPhoto, partnerName, _warmPeach, size: 24),
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
@@ -917,7 +933,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             ),
             const SizedBox(height: 20),
 
-            // 4. COUPLE LIFESTYLE MILESTONE & HAPPINESS RECAP (Bento Card)
+            // 4. COUPLE LIFESTYLE MILESTONE (บันทึกช่วงเวลาแห่งความสุขคู่เรา 🍿)
             Card(
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -934,7 +950,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                         Text('🍿', style: TextStyle(fontSize: 18)),
                         SizedBox(width: 8),
                         Text(
-                          'Date & Happiness Recap',
+                          'บันทึกช่วงเวลาแห่งความสุขคู่เรา',
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                         ),
                       ],
@@ -942,8 +958,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     const SizedBox(height: 14),
 
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Bento Box 1: Date Meals Count
+                        // Bento Box 1: Date Meals Count (สถิติมื้อเดตจริง)
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.all(14),
@@ -971,7 +988,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                         ),
                         const SizedBox(width: 12),
 
-                        // Bento Box 2: Joint Saving Goal Progress
+                        // Bento Box 2: Joint Saving Goal Progress (เป้าหมายออมเงินจริง - ไม่ Hardcode!)
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.all(14),
@@ -982,33 +999,65 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
+                                const Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const Text('🎯 ออมคู่รัก', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                    Text(
-                                      activeGoal != null ? '${activeGoal.progressPercentage.toStringAsFixed(0)}%' : '0%',
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _mintPastel),
-                                    ),
+                                    Text('🎯 ออมคู่รัก', style: TextStyle(fontSize: 11, color: Colors.grey)),
                                   ],
                                 ),
                                 const SizedBox(height: 6),
-                                Text(
-                                  activeGoal?.title ?? 'ปลดหนี้คุณแม่ 50K',
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _mintPastel),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: LinearProgressIndicator(
-                                    value: activeGoal != null ? (activeGoal.progressPercentage / 100) : 0.0,
-                                    backgroundColor: Colors.white,
-                                    color: _mintPastel,
-                                    minHeight: 6,
+                                if (goals.isEmpty) ...[
+                                  const Text(
+                                    'ยังไม่มีเป้าหมาย',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey),
                                   ),
-                                ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'สร้างเป้าหมายออมเงินร่วมกันในหน้าภาพรวม ✨',
+                                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                                  ),
+                                ] else ...[
+                                  // Show active real goals (up to 2 in bento)
+                                  ...goals.where((g) => !g.isCompleted).take(2).map((goal) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                '${goal.emoji} ${goal.title}',
+                                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _mintPastel),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            Text(
+                                              '${goal.progressPercentage.toStringAsFixed(0)}%',
+                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _mintPastel),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(6),
+                                          child: LinearProgressIndicator(
+                                            value: (goal.progressPercentage / 100).clamp(0.0, 1.0),
+                                            backgroundColor: Colors.white,
+                                            color: _mintPastel,
+                                            minHeight: 5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${CurrencyFormatter.format(goal.currentAmount)} / ${CurrencyFormatter.format(goal.targetAmount)}',
+                                          style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
+                                        ),
+                                      ],
+                                    ),
+                                  )),
+                                ],
                               ],
                             ),
                           ),
