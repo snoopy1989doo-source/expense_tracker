@@ -4,6 +4,7 @@ import 'package:expense_tracker/core/utils/currency_formatter.dart';
 import 'package:expense_tracker/core/utils/date_formatter.dart';
 import 'package:expense_tracker/models/transaction_item.dart';
 import 'package:expense_tracker/models/savings_goal.dart';
+import 'package:expense_tracker/services/bill_learning_service.dart';
 
 void main() {
   setUpAll(() async {
@@ -146,6 +147,75 @@ void main() {
     test('handles comma in numbers without crashing', () {
       expect(evalExpression('1,500.50 + 2,499.50'), 4000.0);
       expect(evalExpression('10,000 ÷ 2'), 5000.0);
+    });
+  });
+
+  group('BillLearningService Tests', () {
+    final List<TransactionItem> sampleTxs = [
+      TransactionItem(
+        id: '1',
+        type: 'expense',
+        amount: 1200.0,
+        mainCategoryId: 'home',
+        subCategoryId: 'sub_elec',
+        walletId: 'w1',
+        date: DateTime(2026, 1, 15),
+        isTaxDeductible: false,
+        createdByUserId: 'user-1',
+        createdByName: 'ต๋อง',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      TransactionItem(
+        id: '2',
+        type: 'expense',
+        amount: 1400.0,
+        mainCategoryId: 'home',
+        subCategoryId: 'sub_elec',
+        walletId: 'w1',
+        date: DateTime(2026, 2, 15),
+        isTaxDeductible: false,
+        createdByUserId: 'user-1',
+        createdByName: 'ต๋อง',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      TransactionItem(
+        id: '3',
+        type: 'expense',
+        amount: 1300.0,
+        mainCategoryId: 'home',
+        subCategoryId: 'sub_elec',
+        walletId: 'w1',
+        date: DateTime(2026, 3, 14),
+        isTaxDeductible: false,
+        createdByUserId: 'user-1',
+        createdByName: 'ต๋อง',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+    ];
+
+    test('calculates monthly average correctly', () {
+      final avg = BillLearningService.calculateMonthlyAverage(sampleTxs, 'sub_elec');
+      expect(avg, 1300.0);
+    });
+
+    test('detects typical due day accurately', () {
+      final day = BillLearningService.detectTypicalDueDay(sampleTxs, 'sub_elec');
+      expect(day, 15);
+    });
+
+    test('reports correct paid status for month with transaction', () {
+      final status = BillLearningService.getBillStatus(
+        sampleTxs,
+        'sub_elec',
+        configuredDueDay: 15,
+        currentMonth: DateTime(2026, 2, 1),
+      );
+      expect(status.hasPaidThisMonth, true);
+      expect(status.paidAmountThisMonth, 1400.0);
+      expect(status.statusText, '✅ จ่ายแล้วเดือนนี้');
     });
   });
 }

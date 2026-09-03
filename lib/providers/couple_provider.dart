@@ -52,6 +52,11 @@ final subcategoryBudgetsProvider = Provider<Map<String, double>>((ref) {
   return room?.subcategoryBudgets ?? {};
 });
 
+final recurringBillDueDaysProvider = Provider<Map<String, int>>((ref) {
+  final room = ref.watch(coupleRoomProvider).value;
+  return room?.recurringBillDueDays ?? {};
+});
+
 // ─── Couple Notifier (for setup actions) ─────────────────────────────────────
 
 final coupleNotifierProvider =

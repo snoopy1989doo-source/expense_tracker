@@ -169,19 +169,24 @@ class CoupleRepository {
     }, SetOptions(merge: true));
   }
 
-  /// Set or update budget for a specific subcategory (Option A)
-  Future<void> setSubcategoryBudget(String roomId, String subCatId, double amount) async {
+  /// Set or update budget and optional recurring due day for a specific subcategory
+  Future<void> setSubcategoryBudget(String roomId, String subCatId, double amount, {int? dueDay}) async {
     if (!_isAvailable) return;
-    await _firestore!.collection('couple_rooms').doc(roomId).set({
+    final Map<String, dynamic> updateData = {
       'subcategoryBudgets.$subCatId': amount,
-    }, SetOptions(merge: true));
+    };
+    if (dueDay != null && dueDay >= 1 && dueDay <= 31) {
+      updateData['recurringBillDueDays.$subCatId'] = dueDay;
+    }
+    await _firestore!.collection('couple_rooms').doc(roomId).set(updateData, SetOptions(merge: true));
   }
 
-  /// Remove budget tracking for a specific subcategory
+  /// Remove budget tracking and recurring due day for a specific subcategory
   Future<void> removeSubcategoryBudget(String roomId, String subCatId) async {
     if (!_isAvailable) return;
     await _firestore!.collection('couple_rooms').doc(roomId).update({
       'subcategoryBudgets.$subCatId': FieldValue.delete(),
+      'recurringBillDueDays.$subCatId': FieldValue.delete(),
     });
   }
 

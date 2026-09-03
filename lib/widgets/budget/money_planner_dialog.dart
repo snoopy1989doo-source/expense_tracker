@@ -8,6 +8,8 @@ import '../../models/sub_category.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/transaction_provider.dart';
+import '../../services/bill_learning_service.dart';
+import '../common/confirm_dialog.dart';
 
 class MoneyPlannerDialog extends ConsumerStatefulWidget {
   const MoneyPlannerDialog({super.key});
@@ -26,10 +28,147 @@ class MoneyPlannerDialog extends ConsumerStatefulWidget {
 }
 
 class _MoneyPlannerDialogState extends ConsumerState<MoneyPlannerDialog> {
-  void _showAddOrEditBudgetDialog({SubCategory? existingSubCat, double? existingBudget}) {
+  /// Select category via clean modal bottom sheet (Fixing dropdown overflow)
+  void _openCategoryPicker({
+    required List<SubCategory> availableSubCats,
+    required List<MainCategory> mainCats,
+    required Function(SubCategory) onSelected,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final isDark = theme.brightness == Brightness.dark;
+
+        return DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 10, bottom: 8),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.onSurface.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.category, color: AppColors.primary, size: 20),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'เลือกหมวดหมู่ที่ต้องการเตรียมเงิน',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView.separated(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      itemCount: availableSubCats.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 6),
+                      itemBuilder: (context, index) {
+                        final sub = availableSubCats[index];
+                        final main = mainCats.firstWhere(
+                          (m) => m.id == sub.mainCategoryId,
+                          orElse: () => MainCategory(
+                            id: '',
+                            name: 'ทั่วไป',
+                            emoji: '📁',
+                            color: '#1E88E5',
+                            order: 0,
+                            createdAt: DateTime.now(),
+                            updatedAt: DateTime.now(),
+                          ),
+                        );
+
+                        // Clean category name
+                        final cleanName = sub.name.split('(').first.trim();
+                        final cleanMainName = main.name.split('(').first.trim();
+
+                        return InkWell(
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            onSelected(sub);
+                          },
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF242A38) : Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(sub.emoji, style: const TextStyle(fontSize: 20)),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        cleanName,
+                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                      ),
+                                      Text(
+                                        cleanMainName,
+                                        style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withOpacity(0.55)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Add or Edit budget & due day dialog
+  void _showAddOrEditBudgetDialog({SubCategory? existingSubCat, double? existingBudget, int? existingDueDay}) {
     final subCats = ref.read(subCategoriesProvider);
     final mainCats = ref.read(mainCategoriesProvider);
     final currentBudgets = ref.read(subcategoryBudgetsProvider);
+    final dueDays = ref.read(recurringBillDueDaysProvider);
+    final allTransactions = ref.read(rawTransactionsProvider);
 
     final availableSubCats = existingSubCat != null
         ? subCats
@@ -42,10 +181,17 @@ class _MoneyPlannerDialogState extends ConsumerState<MoneyPlannerDialog> {
       return;
     }
 
-    String selectedSubCatId = existingSubCat?.id ?? availableSubCats.first.id;
+    SubCategory selectedSubCat = existingSubCat ?? availableSubCats.first;
+    double historicalAverage = BillLearningService.calculateMonthlyAverage(allTransactions, selectedSubCat.id);
+    int detectedDueDay = BillLearningService.detectTypicalDueDay(allTransactions, selectedSubCat.id);
+
     final amountController = TextEditingController(
-      text: existingBudget != null ? existingBudget.toStringAsFixed(0) : '',
+      text: existingBudget != null
+          ? existingBudget.toStringAsFixed(0)
+          : (historicalAverage > 0 ? historicalAverage.toStringAsFixed(0) : ''),
     );
+
+    int selectedDueDay = existingDueDay ?? (dueDays[selectedSubCat.id] ?? detectedDueDay);
 
     showDialog(
       context: context,
@@ -58,70 +204,155 @@ class _MoneyPlannerDialogState extends ConsumerState<MoneyPlannerDialog> {
                 const Icon(Icons.account_balance_wallet, color: AppColors.primary),
                 const SizedBox(width: 8),
                 Text(
-                  existingSubCat != null ? '✏️ ปรับงบเตรียมเงิน' : '🎯 เตรียมเงินล่วงหน้า',
+                  existingSubCat != null ? '✏️ แก้ไขแผนเตรียมเงิน' : '🎯 เพิ่มบิล / เตรียมเงิน',
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'กำหนดจำนวนเงินที่ต้องการเตรียมไว้ใช้ในแต่ละเดือนสำหรับหมวดนี้',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-                const SizedBox(height: 14),
-                if (existingSubCat == null) ...[
-                  DropdownButtonFormField<String>(
-                    value: selectedSubCatId,
-                    decoration: const InputDecoration(
-                      labelText: 'เลือกหมวดหมู่ย่อย',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: availableSubCats.map((s) {
-                      final main = mainCats.firstWhere(
-                        (m) => m.id == s.mainCategoryId,
-                        orElse: () => MainCategory(
-                          id: '',
-                          name: 'หมวดหลัก',
-                          emoji: '📁',
-                          color: '#1E88E5',
-                          order: 0,
-                          createdAt: DateTime.now(),
-                          updatedAt: DateTime.now(),
-                        ),
-                      );
-                      return DropdownMenuItem<String>(
-                        value: s.id,
-                        child: Row(
-                          children: [
-                            Text(s.emoji, style: const TextStyle(fontSize: 16)),
-                            const SizedBox(width: 8),
-                            Text('${s.name} (${main.name})', style: const TextStyle(fontSize: 13)),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedSubCatId = val);
-                      }
-                    },
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'กำหนดงบประมาณรายจ่ายและวันที่ครบกำหนดจ่ายประจำเดือน',
+                    style: TextStyle(fontSize: 11.5, color: Colors.grey),
                   ),
                   const SizedBox(height: 14),
-                ],
-                TextField(
-                  controller: amountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'จำนวนเงินเตรียมไว้ (บาท/เดือน)',
-                    hintText: 'เช่น 3,000',
-                    prefixText: '฿ ',
-                    border: OutlineInputBorder(),
+
+                  // Category Selector Button (Clean Bottom Sheet instead of messy dropdown)
+                  if (existingSubCat == null) ...[
+                    InkWell(
+                      onTap: () {
+                        _openCategoryPicker(
+                          availableSubCats: availableSubCats,
+                          mainCats: mainCats,
+                          onSelected: (picked) {
+                            setDialogState(() {
+                              selectedSubCat = picked;
+                              historicalAverage = BillLearningService.calculateMonthlyAverage(allTransactions, picked.id);
+                              detectedDueDay = BillLearningService.detectTypicalDueDay(allTransactions, picked.id);
+                              selectedDueDay = detectedDueDay;
+                              if (historicalAverage > 0 && amountController.text.isEmpty) {
+                                amountController.text = historicalAverage.toStringAsFixed(0);
+                              }
+                            });
+                          },
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade400),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(selectedSubCat.emoji, style: const TextStyle(fontSize: 20)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                selectedSubCat.name.split('(').first.trim(),
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            const Text('เปลี่ยนหมวด', style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold)),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_drop_down, color: AppColors.primary),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Historical Average Helper Card
+                  if (historicalAverage > 0) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.amber.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.auto_graph, size: 16, color: Colors.amber),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'ยอดจ่ายเฉลี่ย: ฿${CurrencyFormatter.format(historicalAverage)} / เดือน',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.brown.shade800),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              setDialogState(() {
+                                amountController.text = historicalAverage.toStringAsFixed(0);
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade700,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text('ใช้ยอดนี้', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Amount Field
+                  TextField(
+                    controller: amountController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'จำนวนเงินเตรียมไว้ (บาท/เดือน)',
+                      hintText: 'เช่น 3,000',
+                      prefixText: '฿ ',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 14),
+
+                  // Due Day of Month (1-31)
+                  Row(
+                    children: [
+                      const Icon(Icons.event, size: 18, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      const Expanded(
+                        child: Text(
+                          'วันที่ต้องจ่ายประจำของเดือน:',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      DropdownButton<int>(
+                        value: selectedDueDay,
+                        items: List.generate(31, (i) => i + 1).map((day) {
+                          return DropdownMenuItem<int>(
+                            value: day,
+                            child: Text('วันที่ $day', style: const TextStyle(fontSize: 13)),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedDueDay = val);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '💡 แนะนำวันที่ $detectedDueDay (ระบบตรวจพบว่ามักจ่ายช่วงวันนี้)',
+                    style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -134,7 +365,12 @@ class _MoneyPlannerDialogState extends ConsumerState<MoneyPlannerDialog> {
                   if (amount != null && amount > 0) {
                     final roomId = ref.read(coupleRoomIdProvider);
                     if (roomId != null) {
-                      await ref.read(coupleRepositoryProvider).setSubcategoryBudget(roomId, selectedSubCatId, amount);
+                      await ref.read(coupleRepositoryProvider).setSubcategoryBudget(
+                            roomId,
+                            selectedSubCat.id,
+                            amount,
+                            dueDay: selectedDueDay,
+                          );
                     }
                     if (ctx.mounted) Navigator.of(ctx).pop();
                     if (mounted) {
@@ -154,13 +390,37 @@ class _MoneyPlannerDialogState extends ConsumerState<MoneyPlannerDialog> {
     );
   }
 
+  /// Delete budget item confirmation
+  void _confirmDeleteBudget(String subCatId, String subCatName) {
+    ConfirmDialog.show(
+      context,
+      title: 'ลบรายการเตรียมเงิน',
+      content: 'คุณแน่ใจหรือไม่ว่าต้องการลบรายการ "$subCatName" ออกจากแผนเตรียมเงินประจำเดือน?',
+      confirmText: 'ลบรายการ',
+      confirmColor: AppColors.expense,
+      onConfirm: () async {
+        final roomId = ref.read(coupleRoomIdProvider);
+        if (roomId != null) {
+          await ref.read(coupleRepositoryProvider).removeSubcategoryBudget(roomId, subCatId);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('ลบรายการ "$subCatName" เรียบร้อย')),
+            );
+          }
+        }
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final budgets = ref.watch(subcategoryBudgetsProvider);
+    final dueDays = ref.watch(recurringBillDueDaysProvider);
     final subCats = ref.watch(subCategoriesProvider);
     final transactions = ref.watch(filteredTransactionsProvider);
+    final allTransactions = ref.watch(rawTransactionsProvider);
     final filters = ref.watch(transactionFiltersProvider);
     final monthName = DateFormatter.formatSmartMonth(filters.selectedMonth);
 
@@ -181,8 +441,15 @@ class _MoneyPlannerDialogState extends ConsumerState<MoneyPlannerDialog> {
     }
     final remainingBudget = totalBudget - totalSpentInBudgetedCats;
 
+    // Discover unplanned recurring bills
+    final discoveredBills = BillLearningService.discoverUnplannedRecurringBills(
+      allTransactions,
+      budgets,
+      subCats,
+    );
+
     return DraggableScrollableSheet(
-      initialChildSize: 0.82,
+      initialChildSize: 0.85,
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
@@ -227,21 +494,27 @@ class _MoneyPlannerDialogState extends ConsumerState<MoneyPlannerDialog> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'แผนเตรียมเงินประจำเดือน 📋',
+                              'แผนเตรียมเงิน & บิลประจำ 📋',
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              'จัดสรรเงินเดือน & คุมรายจ่าย ($monthName)',
+                              'จัดสรรเงินเดือน & เตือนวันจ่าย ($monthName)',
                               style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withOpacity(0.55)),
                             ),
                           ],
                         ),
                       ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.add_circle, color: AppColors.primary, size: 28),
-                      tooltip: 'เพิ่มหมวดเตรียมเงิน',
+                    ElevatedButton.icon(
                       onPressed: () => _showAddOrEditBudgetDialog(),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('เพิ่มบิล', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
                     ),
                   ],
                 ),
@@ -297,6 +570,64 @@ class _MoneyPlannerDialogState extends ConsumerState<MoneyPlannerDialog> {
                 ),
               ),
 
+              // Smart Discovered Recurring Bills Banner
+              if (discoveredBills.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF292418) : Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(discoveredBills.first.emoji, style: const TextStyle(fontSize: 22)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '✨ ตรวจพบบิลประจำจากประวัติ:',
+                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                              ),
+                              Text(
+                                '${discoveredBills.first.title} (เฉลี่ย ฿${CurrencyFormatter.format(discoveredBills.first.monthlyAverage)} จ่ายทุกวันที่ ${discoveredBills.first.detectedDueDay})',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        ElevatedButton(
+                          onPressed: () {
+                            final b = discoveredBills.first;
+                            final sub = subCats.firstWhere((s) => s.id == b.subCategoryId);
+                            _showAddOrEditBudgetDialog(
+                              existingSubCat: sub,
+                              existingBudget: b.monthlyAverage,
+                              existingDueDay: b.detectedDueDay,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.amber.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            minimumSize: Size.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Text('+ เพิ่มเข้าแผน', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
               // List of Budgeted Items
               Expanded(
                 child: budgets.isEmpty
@@ -309,7 +640,7 @@ class _MoneyPlannerDialogState extends ConsumerState<MoneyPlannerDialog> {
                             ElevatedButton.icon(
                               onPressed: () => _showAddOrEditBudgetDialog(),
                               icon: const Icon(Icons.add, size: 16),
-                              label: const Text('เริ่มวางแผนเตรียมเงินกองแรก (เช่น ค่ากิน, ค่าน้ำมัน)'),
+                              label: const Text('เริ่มวางแผนเตรียมเงินกองแรก (เช่น ค่ากิน, ค่าน้ำมัน, ค่าห้อง)'),
                               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
                             ),
                           ],
@@ -325,10 +656,19 @@ class _MoneyPlannerDialogState extends ConsumerState<MoneyPlannerDialog> {
                           final planned = entry.value;
                           final spent = subCatSpending[subCatId] ?? 0.0;
                           final ratio = planned > 0 ? (spent / planned) : 0.0;
+                          final dueDay = dueDays[subCatId];
 
                           final subCat = subCats.firstWhere(
                             (s) => s.id == subCatId,
                             orElse: () => SubCategory(id: subCatId, mainCategoryId: '', name: 'หมวดย่อย', emoji: '🏷️', color: '#E91E63', order: 0),
+                          );
+
+                          final cleanName = subCat.name.split('(').first.trim();
+                          final billStatus = BillLearningService.getBillStatus(
+                            allTransactions,
+                            subCatId,
+                            configuredDueDay: dueDay,
+                            currentMonth: filters.selectedMonth,
                           );
 
                           final isOver = spent > planned;
@@ -337,7 +677,7 @@ class _MoneyPlannerDialogState extends ConsumerState<MoneyPlannerDialog> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: theme.colorScheme.surface,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: isOver ? Colors.red.shade300 : theme.colorScheme.outlineVariant.withOpacity(0.6),
                                 width: isOver ? 1.2 : 0.8,
@@ -351,35 +691,79 @@ class _MoneyPlannerDialogState extends ConsumerState<MoneyPlannerDialog> {
                                     Text(subCat.emoji, style: const TextStyle(fontSize: 22)),
                                     const SizedBox(width: 8),
                                     Expanded(
-                                      child: Text(
-                                        subCat.name,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            cleanName,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Container(
+                                            margin: const EdgeInsets.only(top: 2),
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: billStatus.statusColor.withOpacity(0.12),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              billStatus.statusText,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: billStatus.statusColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    Text(
-                                      isOver
-                                          ? '⚠️ เกินงบ +${CurrencyFormatter.format(spent - planned)}'
-                                          : 'เหลือ ฿${CurrencyFormatter.format(planned - spent)}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: isOver ? Colors.red.shade700 : Colors.green.shade700,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, size: 16),
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                      color: Colors.grey,
-                                      onPressed: () => _showAddOrEditBudgetDialog(
-                                        existingSubCat: subCat,
-                                        existingBudget: planned,
-                                      ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          isOver
+                                              ? '⚠️ เกิน +${CurrencyFormatter.format(spent - planned)}'
+                                              : 'เหลือ ฿${CurrencyFormatter.format(planned - spent)}',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: isOver ? Colors.red.shade700 : Colors.green.shade700,
+                                          ),
+                                        ),
+                                        Row(
+                                          children: [
+                                            // Edit Button
+                                            IconButton(
+                                              icon: const Icon(Icons.edit, size: 16),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              color: Colors.grey,
+                                              tooltip: 'แก้ไข',
+                                              onPressed: () => _showAddOrEditBudgetDialog(
+                                                existingSubCat: subCat,
+                                                existingBudget: planned,
+                                                existingDueDay: dueDay,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            // Delete Button (🗑️)
+                                            IconButton(
+                                              icon: const Icon(Icons.delete_outline, size: 16),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              color: AppColors.expense,
+                                              tooltip: 'ลบรายการ',
+                                              onPressed: () => _confirmDeleteBudget(subCatId, cleanName),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 8),
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(6),
                                   child: LinearProgressIndicator(

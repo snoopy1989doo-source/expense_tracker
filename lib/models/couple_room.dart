@@ -7,6 +7,7 @@ class CoupleRoom {
   final List<Map<String, String>> customFoodMenu;
   final List<Map<String, String>> customQuests;
   final Map<String, double> subcategoryBudgets; // {subCatId: monthlyBudgetAmount}
+  final Map<String, int> recurringBillDueDays; // {subCatId: dayOfMonth (1-31)}
   final List<String> deletedDefaultFood;
   final List<String> deletedDefaultQuests;
   final String? geminiApiKey;
@@ -20,6 +21,7 @@ class CoupleRoom {
     this.customFoodMenu = const [],
     this.customQuests = const [],
     this.subcategoryBudgets = const {},
+    this.recurringBillDueDays = const {},
     this.deletedDefaultFood = const [],
     this.deletedDefaultQuests = const [],
     this.geminiApiKey,
@@ -34,6 +36,15 @@ class CoupleRoom {
     rawBudgets.forEach((k, v) {
       if (v != null) {
         budgets[k.toString()] = (v is num) ? v.toDouble() : (double.tryParse(v.toString()) ?? 0.0);
+      }
+    });
+
+    // Parse recurring bill due days
+    final rawDueDays = map['recurringBillDueDays'] as Map? ?? {};
+    final Map<String, int> dueDays = {};
+    rawDueDays.forEach((k, v) {
+      if (v != null) {
+        dueDays[k.toString()] = (v is num) ? v.toInt() : (int.tryParse(v.toString()) ?? 1);
       }
     });
 
@@ -52,6 +63,7 @@ class CoupleRoom {
           .map((item) => Map<String, String>.from(item as Map))
           .toList(),
       subcategoryBudgets: budgets,
+      recurringBillDueDays: dueDays,
       deletedDefaultFood: List<String>.from(map['deletedDefaultFood'] as List? ?? []),
       deletedDefaultQuests: List<String>.from(map['deletedDefaultQuests'] as List? ?? []),
       geminiApiKey: map['geminiApiKey'] as String?,
@@ -67,6 +79,7 @@ class CoupleRoom {
       'customFoodMenu': customFoodMenu,
       'customQuests': customQuests,
       'subcategoryBudgets': subcategoryBudgets,
+      'recurringBillDueDays': recurringBillDueDays,
       'deletedDefaultFood': deletedDefaultFood,
       'deletedDefaultQuests': deletedDefaultQuests,
       if (geminiApiKey != null) 'geminiApiKey': geminiApiKey,

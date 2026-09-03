@@ -14,7 +14,8 @@ import '../../widgets/common/empty_state.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
-import '../../services/ai_finance_service.dart';
+import '../../models/sub_category.dart';
+import '../../services/bill_learning_service.dart';
 import '../../widgets/budget/money_planner_dialog.dart';
 import '../../widgets/couple/couple_quests_widget.dart';
 import '../../widgets/couple/food_decision_wheel_dialog.dart';
@@ -689,10 +690,74 @@ class DashboardScreen extends ConsumerWidget {
 
   Widget _buildCompactBillReminderRibbon(BuildContext context, WidgetRef ref, List<TransactionItem> transactions) {
     final theme = Theme.of(context);
-    final predictions = AIFinanceService.predictUpcomingExpenses(transactions);
-    final topPrediction = predictions.first;
-
     final isDark = theme.brightness == Brightness.dark;
+    final budgets = ref.watch(subcategoryBudgetsProvider);
+    final dueDays = ref.watch(recurringBillDueDaysProvider);
+    final subCats = ref.watch(subCategoriesProvider);
+
+    String emoji = '🔔';
+    String title = 'บิลประจำเดือน';
+    String description = 'วางแผนเตรียมเงินและติดตามวันครบกำหนดจ่าย';
+
+    if (budgets.isNotEmpty) {
+      BillStatusInfo? mostUrgentStatus;
+      String? mostUrgentName;
+      String? mostUrgentEmoji;
+      double? mostUrgentBudget;
+
+      for (final entry in budgets.entries) {
+        final subCatId = entry.key;
+        final dueDay = dueDays[subCatId];
+        final status = BillLearningService.getBillStatus(
+          transactions,
+          subCatId,
+          configuredDueDay: dueDay,
+        );
+
+        final subCat = subCats.firstWhere(
+          (s) => s.id == subCatId,
+          orElse: () => SubCategory(id: subCatId, mainCategoryId: '', name: 'บิล', emoji: '🧾', color: '#607D8B', order: 0),
+        );
+
+        // Priority 1: Due today or overdue
+        if (status.isDueToday || status.isOverdue) {
+          mostUrgentStatus = status;
+          mostUrgentName = subCat.name.split('(').first.trim();
+          mostUrgentEmoji = subCat.emoji;
+          mostUrgentBudget = entry.value;
+          break;
+        }
+
+        // Priority 2: Unpaid and nearest due date
+        if (!status.hasPaidThisMonth) {
+          if (mostUrgentStatus == null || status.daysRemaining < mostUrgentStatus.daysRemaining) {
+            mostUrgentStatus = status;
+            mostUrgentName = subCat.name.split('(').first.trim();
+            mostUrgentEmoji = subCat.emoji;
+            mostUrgentBudget = entry.value;
+          }
+        }
+      }
+
+      if (mostUrgentStatus != null && mostUrgentName != null) {
+        emoji = mostUrgentEmoji ?? '⚡';
+        title = mostUrgentName;
+        description = '${mostUrgentStatus.statusText} • เตรียมไว้ ฿${CurrencyFormatter.format(mostUrgentBudget ?? 0)}';
+      } else {
+        emoji = '🎉';
+        title = 'จ่ายบิลครบถ้วนแล้ว';
+        description = 'บิลประจำเดือนนี้ทุกรายการจัดการเรียบร้อยแล้ว ยอดเยี่ยมมาก!';
+      }
+    } else {
+      final discovered = BillLearningService.discoverUnplannedRecurringBills(transactions, budgets, subCats);
+      if (discovered.isNotEmpty) {
+        final first = discovered.first;
+        emoji = first.emoji;
+        title = first.title.split('(').first.trim();
+        description = 'จ่ายประจำเฉลี่ย ฿${CurrencyFormatter.format(first.monthlyAverage)} ทุกวันที่ ${first.detectedDueDay}';
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -702,7 +767,7 @@ class DashboardScreen extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Text(topPrediction.iconEmoji, style: const TextStyle(fontSize: 20)),
+          Text(emoji, style: const TextStyle(fontSize: 20)),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -724,7 +789,7 @@ class DashboardScreen extends ConsumerWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        topPrediction.title,
+                        title,
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -733,7 +798,7 @@ class DashboardScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  topPrediction.description.replaceAll('การตรวจจับ', 'ยอดเฉลี่ย'),
+                  description,
                   style: TextStyle(fontSize: 10.5, color: theme.colorScheme.onSurface.withOpacity(0.65)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
