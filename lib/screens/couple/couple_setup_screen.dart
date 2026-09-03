@@ -166,7 +166,7 @@ class _CreateRoomTab extends ConsumerWidget {
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.check_circle_rounded, color: Colors.green, size: 56),
+          const Icon(Icons.check_circle, color: Colors.green, size: 56),
           const SizedBox(height: 16),
           Text(
             'สร้างห้องสำเร็จแล้ว!',
@@ -227,7 +227,7 @@ class _CreateRoomTab extends ConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Icon(
-          Icons.add_home_rounded,
+          Icons.home,
           size: 72,
           color: theme.colorScheme.primary.withOpacity(0.3),
         ),
@@ -255,7 +255,7 @@ class _CreateRoomTab extends ConsumerWidget {
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
-                : const Icon(Icons.favorite_rounded),
+                : const Icon(Icons.favorite),
             label: Text(coupleState.isLoading ? 'กำลังสร้าง...' : 'สร้างห้องคู่รัก'),
             style: ElevatedButton.styleFrom(
               backgroundColor: theme.colorScheme.primary,
@@ -293,7 +293,7 @@ class _JoinRoomTab extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.link_rounded,
+            Icons.link,
             size: 72,
             color: theme.colorScheme.primary.withOpacity(0.3),
           ),
@@ -360,7 +360,7 @@ class _JoinRoomTab extends ConsumerWidget {
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : const Icon(Icons.favorite_rounded),
+                  : const Icon(Icons.favorite),
               label: Text(coupleState.isLoading ? 'กำลังเชื่อมต่อ...' : 'เข้าร่วมห้องคู่รัก'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,

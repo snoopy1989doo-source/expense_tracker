@@ -333,7 +333,7 @@ class DashboardScreen extends ConsumerWidget {
                           child: const Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.qr_code_scanner_rounded, size: 18, color: Color(0xFFFF6584)),
+                              Icon(Icons.qr_code_scanner, size: 18, color: Color(0xFFFF6584)),
                               SizedBox(height: 4),
                               Text('สแกนสลิป', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF6584))),
                             ],

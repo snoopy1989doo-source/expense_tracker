@@ -299,7 +299,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(Icons.calendar_today_rounded, size: 14, color: _softStrawberry),
+                const Icon(Icons.calendar_today, size: 14, color: _softStrawberry),
                 const SizedBox(width: 6),
                 Text(
                   monthName,
@@ -403,7 +403,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.favorite_rounded, size: 16, color: _softStrawberry),
+                          const Icon(Icons.favorite, size: 16, color: _softStrawberry),
                           const SizedBox(width: 6),
                           Text(
                             'กระแสเงินสดคู่เรา ($monthName)',
@@ -565,8 +565,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        const Icon(Icons.people_alt_rounded, color: _softStrawberry, size: 20),
+                        const Icon(Icons.people, color: _softStrawberry, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -763,7 +764,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.pie_chart_rounded, color: _softStrawberry, size: 20),
+                            Icon(Icons.pie_chart, color: _softStrawberry, size: 20),
                             SizedBox(width: 8),
                             Text(
                               'สัดส่วนค่าใช้จ่ายตามหมวดหมู่',
