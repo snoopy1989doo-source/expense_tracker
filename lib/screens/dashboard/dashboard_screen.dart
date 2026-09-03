@@ -678,20 +678,11 @@ class DashboardScreen extends ConsumerWidget {
                       );
                     },
                   ),
-                const SizedBox(height: 80),
+                const SizedBox(height: 20),
               ],
             ),
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddEditTransactionScreen()),
-          );
-        },
-        child: const Icon(Icons.add, size: 28),
       ),
     );
   }
