@@ -15,7 +15,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../services/ai_finance_service.dart';
-import '../../widgets/ai/ai_chat_dialog.dart';
+import '../../widgets/budget/money_planner_dialog.dart';
 import '../../widgets/couple/couple_quests_widget.dart';
 import '../../widgets/couple/food_decision_wheel_dialog.dart';
 import '../../widgets/couple/couple_savings_widget.dart';
@@ -343,24 +343,24 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 8),
 
-                    // 2. Ask AI
+                    // 2. Money Planner (เตรียมเงิน)
                     Expanded(
                       child: InkWell(
-                        onTap: () => AIChatDialog.show(context),
+                        onTap: () => MoneyPlannerDialog.show(context),
                         borderRadius: BorderRadius.circular(14),
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: theme.brightness == Brightness.dark ? Colors.purple.withOpacity(0.18) : Colors.purple.shade50,
+                            color: theme.brightness == Brightness.dark ? Colors.indigo.withOpacity(0.18) : Colors.indigo.shade50,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: theme.brightness == Brightness.dark ? Colors.purple.withOpacity(0.35) : Colors.purple.shade200),
+                            border: Border.all(color: theme.brightness == Brightness.dark ? Colors.indigo.withOpacity(0.35) : Colors.indigo.shade200),
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.auto_awesome, size: 18, color: theme.brightness == Brightness.dark ? const Color(0xFFD8B4FE) : Colors.purple.shade700),
+                              Icon(Icons.account_balance_wallet, size: 18, color: theme.brightness == Brightness.dark ? const Color(0xFFA5B4FC) : Colors.indigo.shade700),
                               const SizedBox(height: 4),
-                              Text('ถาม AI 🤖', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.brightness == Brightness.dark ? const Color(0xFFD8B4FE) : Colors.purple.shade700)),
+                              Text('เตรียมเงิน 📋', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.brightness == Brightness.dark ? const Color(0xFFA5B4FC) : Colors.indigo.shade700)),
                             ],
                           ),
                         ),
@@ -420,8 +420,8 @@ class DashboardScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 14),
 
-                // 4. Compact AI Smart Insights Ribbon
-                _buildCompactAIRibbon(context, ref, ref.watch(rawTransactionsProvider)),
+                // 4. Compact Bill Reminder Ribbon
+                _buildCompactBillReminderRibbon(context, ref, ref.watch(rawTransactionsProvider)),
                 const SizedBox(height: 14),
 
                 // 5. Couple Life Bento Grid (Savings Pot & Budget Side-by-Side)
@@ -687,7 +687,7 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCompactAIRibbon(BuildContext context, WidgetRef ref, List<TransactionItem> transactions) {
+  Widget _buildCompactBillReminderRibbon(BuildContext context, WidgetRef ref, List<TransactionItem> transactions) {
     final theme = Theme.of(context);
     final predictions = AIFinanceService.predictUpcomingExpenses(transactions);
     final topPrediction = predictions.first;
@@ -696,9 +696,9 @@ class DashboardScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF221D2E) : theme.colorScheme.primaryContainer.withOpacity(0.25),
+        color: isDark ? const Color(0xFF1E2235) : const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isDark ? Colors.purple.withOpacity(0.35) : theme.colorScheme.primary.withOpacity(0.2)),
+        border: Border.all(color: isDark ? Colors.blueGrey.withOpacity(0.35) : Colors.blueGrey.shade200),
       ),
       child: Row(
         children: [
@@ -710,9 +710,16 @@ class DashboardScreen extends ConsumerWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      'AI Insight',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: theme.colorScheme.primary),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'บิลประจำเดือน',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: theme.colorScheme.primary),
+                      ),
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -724,8 +731,9 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  topPrediction.description,
+                  topPrediction.description.replaceAll('การตรวจจับ', 'ยอดเฉลี่ย'),
                   style: TextStyle(fontSize: 10.5, color: theme.colorScheme.onSurface.withOpacity(0.65)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -735,10 +743,10 @@ class DashboardScreen extends ConsumerWidget {
           ),
           const SizedBox(width: 6),
           InkWell(
-            onTap: () => AIChatDialog.show(context),
+            onTap: () => MoneyPlannerDialog.show(context),
             borderRadius: BorderRadius.circular(10),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary,
                 borderRadius: BorderRadius.circular(10),
@@ -746,9 +754,9 @@ class DashboardScreen extends ConsumerWidget {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.auto_awesome, size: 10, color: Colors.white),
-                  SizedBox(width: 2),
-                  Text('ถาม AI', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                  Icon(Icons.edit_calendar, size: 11, color: Colors.white),
+                  SizedBox(width: 3),
+                  Text('คุมงบ', style: TextStyle(fontSize: 10.5, color: Colors.white, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
