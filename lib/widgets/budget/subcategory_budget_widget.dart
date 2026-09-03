@@ -423,6 +423,66 @@ class _SubcategoryBudgetWidgetState extends ConsumerState<SubcategoryBudgetWidge
                             ),
                           ],
                         ),
+
+                        // Affectionate Couple Tip Bubble 💌
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: spent > targetBudget
+                                ? (theme.brightness == Brightness.dark
+                                    ? const Color(0xFF3B1E28)
+                                    : const Color(0xFFFFF0F3))
+                                : (ratio >= 0.8
+                                    ? (theme.brightness == Brightness.dark
+                                        ? const Color(0xFF332A1A)
+                                        : const Color(0xFFFFFBEB))
+                                    : (theme.brightness == Brightness.dark
+                                        ? const Color(0xFF162D24)
+                                        : const Color(0xFFF0FDF4))),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: spent > targetBudget
+                                  ? const Color(0xFFFF6584).withOpacity(0.3)
+                                  : (ratio >= 0.8
+                                      ? Colors.amber.shade300
+                                      : Colors.green.shade200),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                spent > targetBudget
+                                    ? '🫂'
+                                    : (ratio >= 0.8 ? '🍳' : '🌟'),
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  spent > targetBudget
+                                      ? 'หมวด ${subCat.name} ทะลุเพดานไปนิด แต่ไม่เป็นไรน้า! เดือนนี้เน้นความสุข เดือนหน้าค่อยกอดคอช่วยกันใหม่นะคนเก่ง 🥰'
+                                      : (ratio >= 0.8
+                                          ? 'งบ ${subCat.name} เดือนนี้แตะ ${percentage.toStringAsFixed(0)}% แล้วน้า สัปดาห์นี้ชวนกันทำอาหารกินที่บ้านหรือช่วยกันประหยัดหน่อยนะคนดี 💕'
+                                          : 'ช่วยกันคุมงบ ${subCat.name} ได้ยอดเยี่ยมมาก แฟนภูมิใจในตัวคุณสุดๆ เลย! ✨'),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    height: 1.35,
+                                    fontWeight: FontWeight.w500,
+                                    color: spent > targetBudget
+                                        ? (theme.brightness == Brightness.dark ? const Color(0xFFFF8DA1) : const Color(0xFFBE123C))
+                                        : (ratio >= 0.8
+                                            ? (theme.brightness == Brightness.dark ? const Color(0xFFFCD34D) : const Color(0xFFB45309))
+                                            : (theme.brightness == Brightness.dark ? const Color(0xFF86EFAC) : const Color(0xFF15803D))),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   );

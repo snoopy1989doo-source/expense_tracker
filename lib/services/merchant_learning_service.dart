@@ -7,6 +7,7 @@ class MerchantMemory {
   final String name;
   final String mainCategoryId;
   final String? subCategoryId;
+  final String? walletId; // Preferred wallet used for this merchant
   final int count; // Capped at 5 to prevent database bloat
   final DateTime lastUpdated;
 
@@ -14,6 +15,7 @@ class MerchantMemory {
     required this.name,
     required this.mainCategoryId,
     this.subCategoryId,
+    this.walletId,
     this.count = 1,
     required this.lastUpdated,
   });
@@ -23,6 +25,7 @@ class MerchantMemory {
       'name': name,
       'mainCategoryId': mainCategoryId,
       'subCategoryId': subCategoryId,
+      'walletId': walletId,
       'count': count,
       'lastUpdated': Timestamp.fromDate(lastUpdated),
     };
@@ -33,9 +36,12 @@ class MerchantMemory {
       name: map['name'] ?? '',
       mainCategoryId: map['mainCategoryId'] ?? '',
       subCategoryId: map['subCategoryId'],
+      walletId: map['walletId'],
       count: (map['count'] as num?)?.toInt() ?? 1,
       lastUpdated: map['lastUpdated'] != null
-          ? (map['lastUpdated'] as Timestamp).toDate()
+          ? (map['lastUpdated'] is Timestamp
+              ? (map['lastUpdated'] as Timestamp).toDate()
+              : DateTime.tryParse(map['lastUpdated'].toString()) ?? DateTime.now())
           : DateTime.now(),
     );
   }
@@ -45,7 +51,7 @@ class MerchantLearningService {
   static const String _prefKey = 'ai_merchant_memory_cache_v1';
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Predict category based on learned history (quietly in background)
+  /// Predict category & wallet based on learned history (quietly in background)
   static Future<MerchantMemory?> predictCategory({
     required String receiverOrMerchantName,
     String? householdId,
@@ -66,6 +72,7 @@ class MerchantLearningService {
               name: data['name'] ?? entry.key,
               mainCategoryId: data['mainCategoryId'] ?? '',
               subCategoryId: data['subCategoryId'],
+              walletId: data['walletId'],
               count: data['count'] ?? 1,
               lastUpdated: DateTime.now(),
             );
@@ -92,11 +99,12 @@ class MerchantLearningService {
     return null;
   }
 
-  /// Learn / record category choice (Capped at 5 records per name to prevent bloating)
+  /// Learn / record category and wallet choice (Capped at 5 records per name to prevent bloating)
   static Future<void> learnMerchantCategory({
     required String receiverOrMerchantName,
     required String mainCategoryId,
     String? subCategoryId,
+    String? walletId,
     String? householdId,
   }) async {
     final cleanName = _cleanKey(receiverOrMerchantName);
@@ -127,6 +135,7 @@ class MerchantLearningService {
         'name': receiverOrMerchantName.trim(),
         'mainCategoryId': mainCategoryId,
         'subCategoryId': subCategoryId,
+        'walletId': walletId,
         'count': currentCount + 1,
         'lastUpdated': DateTime.now().toIso8601String(),
       };
@@ -145,6 +154,7 @@ class MerchantLearningService {
           'name': receiverOrMerchantName.trim(),
           'mainCategoryId': mainCategoryId,
           'subCategoryId': subCategoryId,
+          'walletId': walletId,
           'count': currentCount + 1,
           'lastUpdated': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));

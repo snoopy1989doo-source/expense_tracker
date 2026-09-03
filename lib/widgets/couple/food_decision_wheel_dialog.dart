@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../screens/transaction/add_edit_transaction_screen.dart';
@@ -48,8 +49,21 @@ class _FoodDecisionWheelDialogState extends ConsumerState<FoodDecisionWheelDialo
     );
 
     _animation = CurvedAnimation(parent: _controller, curve: Curves.decelerate);
+    int lastSector = -1;
+    _controller.addListener(() {
+      if (_targetAngle > 0) {
+        final currentAngle = _animation.value * _targetAngle;
+        final sector = (currentAngle / 0.5).floor();
+        if (sector != lastSector) {
+          lastSector = sector;
+          HapticFeedback.selectionClick();
+        }
+      }
+    });
+
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
+        HapticFeedback.mediumImpact();
         setState(() {
           _isSpinning = false;
         });

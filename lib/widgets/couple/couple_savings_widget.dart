@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
@@ -290,9 +291,15 @@ class _CoupleSavingsWidgetState extends ConsumerState<CoupleSavingsWidget> {
                   });
                 }
 
+                final isCompletedNow = (goal.currentAmount + amount) >= goal.targetAmount;
+                if (isCompletedNow) {
+                  HapticFeedback.heavyImpact();
+                } else {
+                  HapticFeedback.mediumImpact();
+                }
+
                 if (ctx.mounted) Navigator.of(ctx).pop();
                 if (mounted) {
-                  final isCompletedNow = (goal.currentAmount + amount) >= goal.targetAmount;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(

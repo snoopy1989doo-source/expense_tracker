@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../../services/slip_ocr_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
@@ -208,6 +208,8 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     final fullTextToScan = '$fileName $extractedText'.toLowerCase();
     String? matchedCategory;
     String? matchedSubCategory;
+    String? matchedWallet;
+    String? aiMemoryReason;
     double? matchedAmount;
 
     // Tier 1: Direct match from QR Tag 54 payload e.g. "จำนวนเงิน 130.00 บาท"
@@ -272,7 +274,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       }
     }
 
-    // AI Prediction from learned memory
+    // AI Prediction from learned memory (including Wallet & Subcategory)
     if (_detectedReceiverName != null) {
       final memory = await MerchantLearningService.predictCategory(
         receiverOrMerchantName: _detectedReceiverName!,
@@ -281,14 +283,102 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
       if (memory != null && memory.mainCategoryId.isNotEmpty) {
         matchedCategory = memory.mainCategoryId;
         matchedSubCategory = memory.subCategoryId;
-        debugPrint('✨ AI predicted category ${memory.mainCategoryId} from memory for $_detectedReceiverName');
+        if (memory.walletId != null && memory.walletId!.isNotEmpty) {
+          final userWallets = ref.read(walletsProvider);
+          if (userWallets.any((w) => w.id == memory.walletId)) {
+            matchedWallet = memory.walletId;
+          }
+        }
+        final walletObj = ref.read(walletsProvider).where((w) => w.id == matchedWallet).firstOrNull;
+        final subObj = subCats.where((s) => s.id == matchedSubCategory).firstOrNull;
+        aiMemoryReason = '✨ AI จำได้: ร้าน "$_detectedReceiverName"${walletObj != null ? " จ่ายด้วย ${walletObj.name}" : ""}${subObj != null ? " ในหมวด ${subObj.name}" : ""}';
+        debugPrint('✨ AI predicted category & wallet from memory for $_detectedReceiverName');
       }
     }
 
-    // Keyword rule-based fallback if AI hasn't learned yet
+    // Popular Thai Stores Preset Matching
     if (matchedCategory == null) {
-      // 1. Fuel / Gas Stations (ปตท, PTT, Oil, ปิโตรเลียม, บางจาก, เชลล์, Caltex, PT, Esso, Susco)
-      if (fullTextToScan.contains('ปตท') ||
+      // 1. Convenience / 7-Eleven / CJ Express
+      if (fullTextToScan.contains('7-eleven') ||
+          fullTextToScan.contains('711') ||
+          fullTextToScan.contains('เซเว่น') ||
+          fullTextToScan.contains('cpall') ||
+          fullTextToScan.contains('ซีพี ออลล์') ||
+          fullTextToScan.contains('cj express') ||
+          fullTextToScan.contains('ซีเจ')) {
+        final foodCat = mainCats.firstWhere(
+          (c) => c.name.contains('กิน') || c.name.contains('อาหาร') || c.id.contains('food'),
+          orElse: () => mainCats.first,
+        );
+        matchedCategory = foodCat.id;
+        final convSub = subCats.firstWhere(
+          (s) => s.mainCategoryId == foodCat.id && (s.name.contains('สะดวกซื้อ') || s.name.contains('ขนม') || s.name.contains('เซเว่น')),
+          orElse: () => subCats.firstWhere((s) => s.mainCategoryId == foodCat.id, orElse: () => subCats.first),
+        );
+        matchedSubCategory = convSub.id;
+        final userWallets = ref.read(walletsProvider);
+        final tmWallet = userWallets.where((w) => w.name.toLowerCase().contains('true') || w.name.contains('ทรู')).firstOrNull;
+        if (tmWallet != null) matchedWallet = tmWallet.id;
+      }
+      // 2. Cafe / Amazon / Starbucks / Punthai / Tao Bin
+      else if (fullTextToScan.contains('amazon') ||
+          fullTextToScan.contains('อเมซอน') ||
+          fullTextToScan.contains('starbucks') ||
+          fullTextToScan.contains('สตาร์บัค') ||
+          fullTextToScan.contains('เต่าบิน') ||
+          fullTextToScan.contains('พันธุ์ไทย') ||
+          fullTextToScan.contains('punthai') ||
+          fullTextToScan.contains('ชาตรามือ')) {
+        final foodCat = mainCats.firstWhere(
+          (c) => c.name.contains('กิน') || c.name.contains('อาหาร') || c.id.contains('food'),
+          orElse: () => mainCats.first,
+        );
+        matchedCategory = foodCat.id;
+        final cafeSub = subCats.firstWhere(
+          (s) => s.mainCategoryId == foodCat.id && (s.name.contains('กาแฟ') || s.name.contains('เครื่องดื่ม') || s.name.contains('ชา') || s.name.contains('ของหวาน')),
+          orElse: () => subCats.firstWhere((s) => s.mainCategoryId == foodCat.id, orElse: () => subCats.first),
+        );
+        matchedSubCategory = cafeSub.id;
+      }
+      // 3. Supermarkets / Lotus / Big C / Tops / Makro
+      else if (fullTextToScan.contains('lotus') ||
+          fullTextToScan.contains('โลตัส') ||
+          fullTextToScan.contains('big c') ||
+          fullTextToScan.contains('บิ๊กซี') ||
+          fullTextToScan.contains('tops') ||
+          fullTextToScan.contains('ท็อปส์') ||
+          fullTextToScan.contains('makro') ||
+          fullTextToScan.contains('แม็คโคร')) {
+        final shopCat = mainCats.firstWhere(
+          (c) => c.name.contains('ช้อป') || c.name.contains('ของใช้') || c.name.contains('Shopping') || c.id.contains('shopping'),
+          orElse: () => mainCats.first,
+        );
+        matchedCategory = shopCat.id;
+        final superSub = subCats.firstWhere(
+          (s) => s.mainCategoryId == shopCat.id && (s.name.contains('ซูเปอร์') || s.name.contains('ของใช้') || s.name.contains('ตลาด')),
+          orElse: () => subCats.firstWhere((s) => s.mainCategoryId == shopCat.id, orElse: () => subCats.first),
+        );
+        matchedSubCategory = superSub.id;
+      }
+      // 4. Delivery / Grab / LINE MAN / ShopeeFood
+      else if (fullTextToScan.contains('grab') ||
+          fullTextToScan.contains('แกร็บ') ||
+          fullTextToScan.contains('lineman') ||
+          fullTextToScan.contains('ไลน์แมน') ||
+          fullTextToScan.contains('shopeefood')) {
+        final foodCat = mainCats.firstWhere(
+          (c) => c.name.contains('กิน') || c.name.contains('อาหาร') || c.id.contains('food'),
+          orElse: () => mainCats.first,
+        );
+        matchedCategory = foodCat.id;
+        final delivSub = subCats.firstWhere(
+          (s) => s.mainCategoryId == foodCat.id && (s.name.contains('เดลิเวอรี') || s.name.contains('สั่งอาหาร') || s.name.contains('มื้อหลัก')),
+          orElse: () => subCats.firstWhere((s) => s.mainCategoryId == foodCat.id, orElse: () => subCats.first),
+        );
+        matchedSubCategory = delivSub.id;
+      }
+      // 5. Fuel / Gas Stations (ปตท, PTT, Oil, ปิโตรเลียม, บางจาก, เชลล์, Caltex, PT, Esso, Susco)
+      else if (fullTextToScan.contains('ปตท') ||
           fullTextToScan.contains('ptt') ||
           fullTextToScan.contains('ปิโตรเลียม') ||
           fullTextToScan.contains('petroleum') ||
@@ -371,10 +461,19 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
             _selectedSubCategoryId = matchedSubCategory;
           }
         }
+        if (matchedWallet != null) {
+          _selectedWalletId = matchedWallet;
+        }
       });
 
-      String successMsg;
       if (matchedAmount != null) {
+        HapticFeedback.mediumImpact();
+      }
+
+      String successMsg;
+      if (aiMemoryReason != null) {
+        successMsg = aiMemoryReason;
+      } else if (matchedAmount != null) {
         if (_receiptImagesList.length > 1 && finalTotalAmount != null) {
           successMsg = '✨ AI สแกนสลิปเพิ่มสำเร็จ! (+฿${matchedAmount.toStringAsFixed(2)}) รวมยอดบิลเป็น ฿${finalTotalAmount.toStringAsFixed(2)}';
         } else {
@@ -861,11 +960,13 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
           receiverOrMerchantName: _detectedReceiverName!,
           mainCategoryId: _selectedMainCategoryId!,
           subCategoryId: _selectedSubCategoryId,
+          walletId: _selectedWalletId,
           householdId: coupleRoomId,
         );
       }
 
       if (mounted) {
+        HapticFeedback.lightImpact();
         Navigator.of(context).pop();
       }
     } catch (e) {
