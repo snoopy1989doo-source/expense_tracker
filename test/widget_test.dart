@@ -5,6 +5,7 @@ import 'package:expense_tracker/core/utils/date_formatter.dart';
 import 'package:expense_tracker/models/transaction_item.dart';
 import 'package:expense_tracker/models/savings_goal.dart';
 import 'package:expense_tracker/services/bill_learning_service.dart';
+import 'package:expense_tracker/core/utils/name_helper.dart';
 
 void main() {
   setUpAll(() async {
@@ -216,6 +217,35 @@ void main() {
       expect(status.hasPaidThisMonth, true);
       expect(status.paidAmountThisMonth, 1400.0);
       expect(status.statusText, '✅ จ่ายแล้วเดือนนี้');
+    });
+  });
+
+  group('NameHelper Tests', () {
+    test('prioritizes nickname when present', () {
+      final name = NameHelper.resolveDisplayName(
+        nickname: 'ต๋องแต่ง',
+        email: 'dooodo@gmail.com',
+        defaultFallback: 'แฟน',
+      );
+      expect(name, 'ต๋องแต่ง');
+    });
+
+    test('falls back to Gmail / email username when nickname is empty', () {
+      final name = NameHelper.resolveDisplayName(
+        nickname: '',
+        email: 'kevalin.p@gmail.com',
+        defaultFallback: 'แฟน',
+      );
+      expect(name, 'kevalin.p');
+    });
+
+    test('falls back to defaultFallback when both nickname and email are empty', () {
+      final name = NameHelper.resolveDisplayName(
+        nickname: null,
+        email: null,
+        defaultFallback: 'แฟน 💕',
+      );
+      expect(name, 'แฟน 💕');
     });
   });
 }

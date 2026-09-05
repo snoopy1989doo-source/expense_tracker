@@ -14,6 +14,7 @@ import '../../widgets/common/empty_state.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../core/utils/name_helper.dart';
 import '../../models/sub_category.dart';
 import '../../services/bill_learning_service.dart';
 import '../../widgets/budget/money_planner_dialog.dart';
@@ -32,6 +33,12 @@ class DashboardScreen extends ConsumerWidget {
 
   Widget _buildAvatar(String? photoBase64, String nickname, Color bgColor, {double size = 32}) {
     if (photoBase64 != null && photoBase64.isNotEmpty) {
+      if (photoBase64.startsWith('http')) {
+        return CircleAvatar(
+          radius: size / 2,
+          backgroundImage: NetworkImage(photoBase64),
+        );
+      }
       try {
         final cleanBase64 = photoBase64.contains(',') ? photoBase64.split(',').last : photoBase64;
         return CircleAvatar(
@@ -75,24 +82,35 @@ class DashboardScreen extends ConsumerWidget {
     final totalAssets = wallets.fold<double>(0, (sum, w) => sum + w.currentBalance);
 
     // User & Partner names
-    final userName = userProfile?.nickname.isNotEmpty == true
-        ? userProfile!.nickname
-        : (userProfile?.email.isNotEmpty == true ? userProfile!.email.split('@').first : 'ฉัน');
+    final userName = NameHelper.resolveDisplayName(
+      nickname: userProfile?.nickname,
+      email: userProfile?.email,
+      defaultFallback: 'ฉัน',
+    );
 
-    final String partnerName;
-    final partnerEmail = partnerProfile?.email ?? '';
-    if (partnerProfile?.nickname.isNotEmpty == true) {
-      partnerName = partnerProfile!.nickname;
-    } else if (partnerEmail.isNotEmpty) {
-      partnerName = partnerEmail.split('@').first;
-    } else {
-      partnerName = 'แฟน';
-    }
+    final partnerName = NameHelper.resolveDisplayName(
+      nickname: partnerProfile?.nickname,
+      email: partnerProfile?.email,
+      defaultFallback: 'แฟน',
+    );
 
     final goals = goalsAsync.value ?? [];
     final activeGoals = goals.where((g) => !g.isCompleted).toList();
     final room = roomAsync.value;
     final subBudgets = room?.subcategoryBudgets ?? {};
+
+    // Auto-sync current user's profile to couple_rooms document if changed or missing
+    if (userProfile != null && room != null) {
+      final existingInfo = room.membersInfo[userProfile.id];
+      if (existingInfo == null ||
+          existingInfo['nickname'] != userProfile.nickname ||
+          existingInfo['email'] != userProfile.email ||
+          existingInfo['photoBase64'] != userProfile.photoBase64) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(coupleNotifierProvider.notifier).syncMyProfile(userProfile, room.id);
+        });
+      }
+    }
 
     return Scaffold(
       body: SafeArea(

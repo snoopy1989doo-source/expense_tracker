@@ -107,6 +107,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final uid = await _repository.signInWithEmailAndPassword(email, password);
       if (uid != null) {
+        // Ensure user profile document exists with email and nickname
+        final existing = await _profileRepo.getUserProfile(uid);
+        if (existing == null) {
+          final profile = UserProfile(
+            id: uid,
+            email: email,
+            nickname: email.split('@').first,
+            photoBase64: null,
+            coupleRoomId: null,
+            createdAt: DateTime.now(),
+          );
+          await _profileRepo.saveProfile(profile);
+        } else if (existing.email.isEmpty) {
+          await _profileRepo.saveProfile(existing.copyWith(email: email));
+        }
         state = AuthState.authenticated(uid);
       } else {
         state = AuthState.error('ไม่สามารถเข้าสู่ระบบได้');
@@ -146,17 +161,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Google Sign-In — creates profile if first time
+  /// Google Sign-In — creates profile if first time and enriches missing fields
   Future<void> signInWithGoogle() async {
     state = AuthState.loading();
     try {
       final uid = await _repository.signInWithGoogle();
       if (uid != null) {
-        // Check if profile exists, if not create one
+        final fbUser = fb.FirebaseAuth.instance.currentUser;
         final existing = await _profileRepo.getUserProfile(uid);
         if (existing == null) {
-          // Get display name/email from Firebase Auth
-          final fbUser = fb.FirebaseAuth.instance.currentUser;
           final profile = UserProfile(
             id: uid,
             email: fbUser?.email ?? '',
@@ -166,6 +179,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
             createdAt: DateTime.now(),
           );
           await _profileRepo.saveProfile(profile);
+        } else {
+          // If profile exists, ensure email, photo, or name are kept up to date
+          bool needsUpdate = false;
+          String email = existing.email;
+          String? photo = existing.photoBase64;
+          String nickname = existing.nickname;
+
+          if (email.isEmpty && fbUser?.email != null) {
+            email = fbUser!.email!;
+            needsUpdate = true;
+          }
+          if ((photo == null || photo.isEmpty) && fbUser?.photoURL != null) {
+            photo = fbUser!.photoURL;
+            needsUpdate = true;
+          }
+          if (nickname.isEmpty && fbUser?.displayName != null) {
+            nickname = fbUser!.displayName!;
+            needsUpdate = true;
+          }
+          if (needsUpdate) {
+            await _profileRepo.saveProfile(existing.copyWith(
+              email: email,
+              photoBase64: photo,
+              nickname: nickname,
+            ));
+          }
         }
         state = AuthState.authenticated(uid);
       } else {

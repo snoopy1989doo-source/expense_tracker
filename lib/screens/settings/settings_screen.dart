@@ -15,6 +15,7 @@ import '../wallet/wallet_management_screen.dart';
 import '../couple/couple_setup_screen.dart';
 import '../../widgets/common/confirm_dialog.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/name_helper.dart';
 
 final Map<String, Uint8List> _base64ImageCache = {};
 
@@ -65,6 +66,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           createdAt: userProfile?.createdAt ?? DateTime.now(),
         );
         await profileRepo.saveProfile(updatedProfile);
+
+        if (updatedProfile.coupleRoomId != null) {
+          await ref.read(coupleRepositoryProvider).syncMemberInfo(
+            updatedProfile.coupleRoomId!,
+            userId,
+            nickname: updatedProfile.nickname,
+            email: updatedProfile.email,
+            photoBase64: updatedProfile.photoBase64,
+          );
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -180,6 +191,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   );
                   await profileRepo.saveProfile(updatedProfile);
                   await ref.read(rawTransactionsProvider.notifier).updateCreatorNameForUser(userId, newName);
+
+                  if (updatedProfile.coupleRoomId != null) {
+                    await ref.read(coupleRepositoryProvider).syncMemberInfo(
+                      updatedProfile.coupleRoomId!,
+                      userId,
+                      nickname: updatedProfile.nickname,
+                      email: updatedProfile.email,
+                      photoBase64: updatedProfile.photoBase64,
+                    );
+                  }
+
                   if (ctx.mounted) Navigator.of(ctx).pop();
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -261,17 +283,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final partnerPhotoUrl = partnerProfile?.photoBase64;
     final partnerImageBytes = _getCachedImageBytes(partnerPhotoUrl);
 
-    final String partnerName;
-    if (partnerProfile != null) {
-      if (partnerProfile.nickname.isNotEmpty) {
-        partnerName = partnerProfile.nickname;
-      } else if (partnerProfile.email.isNotEmpty) {
-        partnerName = partnerProfile.email.split('@').first;
-      } else {
-        partnerName = 'แฟน 💕';
+    final String userName = NameHelper.resolveDisplayName(
+      nickname: userProfile?.nickname,
+      email: userProfile?.email,
+      defaultFallback: 'ฉัน',
+    );
+
+    final String partnerName = NameHelper.resolveDisplayName(
+      nickname: partnerProfile?.nickname,
+      email: partnerProfile?.email,
+      defaultFallback: coupleRoomAsync.value?.isFull == true ? 'แฟน 💕' : 'ยังไม่มีคู่รัก',
+    );
+
+    // Auto-sync current user's profile to couple_rooms document if changed or not yet stored
+    if (userProfile != null && coupleRoomAsync.value != null) {
+      final room = coupleRoomAsync.value!;
+      final existingInfo = room.membersInfo[userProfile.id];
+      if (existingInfo == null ||
+          existingInfo['nickname'] != userProfile.nickname ||
+          existingInfo['email'] != userProfile.email ||
+          existingInfo['photoBase64'] != userProfile.photoBase64) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(coupleNotifierProvider.notifier).syncMyProfile(userProfile, room.id);
+        });
       }
-    } else {
-      partnerName = coupleRoomAsync.value?.isFull == true ? 'แฟน 💕' : 'ยังไม่มีคู่รัก';
     }
 
     return Scaffold(
@@ -407,7 +442,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                               : null),
                                       child: (profileImageBytes == null && (photoUrl == null || !photoUrl.startsWith('http')))
                                           ? Text(
-                                              userProfile != null && userProfile.nickname.isNotEmpty ? userProfile.nickname.substring(0, 1) : '👤',
+                                              userName.isNotEmpty ? userName.characters.first : '👤',
                                               style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 24),
                                             )
                                           : null,
@@ -426,7 +461,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 children: [
                                   Flexible(
                                     child: Text(
-                                      userProfile?.nickname ?? 'ฉัน',
+                                      userName,
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -506,8 +541,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                               : null),
                                       child: (partnerImageBytes == null && (partnerPhotoUrl == null || !partnerPhotoUrl.startsWith('http')))
                                           ? Text(
-                                              partnerProfile != null && partnerProfile.nickname.isNotEmpty
-                                                  ? partnerProfile.nickname.substring(0, 1)
+                                              partnerName.isNotEmpty
+                                                  ? partnerName.characters.first
                                                   : (coupleRoomAsync.value?.isFull == true ? 'แฟน' : '➕'),
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,

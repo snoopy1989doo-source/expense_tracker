@@ -7,8 +7,10 @@ import '../reports/reports_screen.dart';
 import '../settings/settings_screen.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/couple_provider.dart';
 import '../../models/transaction_item.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../core/utils/name_helper.dart';
 
 class MainNavigationScreen extends ConsumerStatefulWidget {
   const MainNavigationScreen({super.key});
@@ -32,6 +34,21 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUserId = ref.watch(authStateProvider).value;
+    final userProfile = ref.watch(userProfileProvider).value;
+    final coupleRoom = ref.watch(coupleRoomProvider).value;
+
+    // Auto-sync current user profile to couple_rooms document if changed or missing
+    if (userProfile != null && coupleRoom != null) {
+      final existingInfo = coupleRoom.membersInfo[userProfile.id];
+      if (existingInfo == null ||
+          existingInfo['nickname'] != userProfile.nickname ||
+          existingInfo['email'] != userProfile.email ||
+          existingInfo['photoBase64'] != userProfile.photoBase64) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(coupleNotifierProvider.notifier).syncMyProfile(userProfile, coupleRoom.id);
+        });
+      }
+    }
 
     // Listen to real-time transactions stream for partner notifications
     ref.listen<List<TransactionItem>>(rawTransactionsProvider, (previous, next) {
@@ -55,7 +72,12 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
         // If transaction was created by partner
         if (tx.createdByUserId != null && tx.createdByUserId != currentUserId) {
-          final partnerName = tx.createdByName ?? 'แฟนของคุณ';
+          final partnerProfile = ref.read(partnerProfileProvider).value;
+          final partnerName = NameHelper.resolveDisplayName(
+            nickname: partnerProfile?.nickname ?? tx.createdByName,
+            email: partnerProfile?.email,
+            defaultFallback: 'แฟนของคุณ',
+          );
           final typeText = tx.type == 'income' ? 'รายรับ' : 'รายจ่าย';
           final amountText = CurrencyFormatter.format(tx.amount);
 

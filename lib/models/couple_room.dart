@@ -8,6 +8,7 @@ class CoupleRoom {
   final List<Map<String, String>> customQuests;
   final Map<String, double> subcategoryBudgets; // {subCatId: monthlyBudgetAmount}
   final Map<String, int> recurringBillDueDays; // {subCatId: dayOfMonth (1-31)}
+  final Map<String, Map<String, dynamic>> membersInfo; // {userId: {nickname, email, photoBase64}}
   final List<String> deletedDefaultFood;
   final List<String> deletedDefaultQuests;
   final String? geminiApiKey;
@@ -22,6 +23,7 @@ class CoupleRoom {
     this.customQuests = const [],
     this.subcategoryBudgets = const {},
     this.recurringBillDueDays = const {},
+    this.membersInfo = const {},
     this.deletedDefaultFood = const [],
     this.deletedDefaultQuests = const [],
     this.geminiApiKey,
@@ -48,6 +50,15 @@ class CoupleRoom {
       }
     });
 
+    // Parse members info
+    final rawMembers = map['membersInfo'] as Map? ?? {};
+    final Map<String, Map<String, dynamic>> membersInfo = {};
+    rawMembers.forEach((k, v) {
+      if (v is Map) {
+        membersInfo[k.toString()] = Map<String, dynamic>.from(v);
+      }
+    });
+
     return CoupleRoom(
       id: id,
       inviteCode: map['inviteCode'] as String? ?? '',
@@ -64,6 +75,7 @@ class CoupleRoom {
           .toList(),
       subcategoryBudgets: budgets,
       recurringBillDueDays: dueDays,
+      membersInfo: membersInfo,
       deletedDefaultFood: List<String>.from(map['deletedDefaultFood'] as List? ?? []),
       deletedDefaultQuests: List<String>.from(map['deletedDefaultQuests'] as List? ?? []),
       geminiApiKey: map['geminiApiKey'] as String?,
@@ -80,6 +92,7 @@ class CoupleRoom {
       'customQuests': customQuests,
       'subcategoryBudgets': subcategoryBudgets,
       'recurringBillDueDays': recurringBillDueDays,
+      'membersInfo': membersInfo,
       'deletedDefaultFood': deletedDefaultFood,
       'deletedDefaultQuests': deletedDefaultQuests,
       if (geminiApiKey != null) 'geminiApiKey': geminiApiKey,

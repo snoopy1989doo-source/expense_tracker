@@ -30,19 +30,51 @@ final coupleRoomProvider = StreamProvider<CoupleRoom?>((ref) {
 
 // ─── Partner Profile Stream Provider ──────────────────────────────────────────
 
-final partnerProfileProvider = StreamProvider<UserProfile?>((ref) {
+final partnerProfileProvider = StreamProvider<UserProfile?>((ref) async* {
   final room = ref.watch(coupleRoomProvider).value;
-  final currentUserId = ref.watch(authStateProvider).value;
-  if (room == null || currentUserId == null) return Stream.value(null);
+  final currentUserId = ref.watch(userProfileProvider).value?.id ?? ref.watch(authStateProvider).value;
+  if (room == null || currentUserId == null) {
+    yield null;
+    return;
+  }
 
   final partnerId = room.memberIds.firstWhere(
     (id) => id != currentUserId,
     orElse: () => '',
   );
-  if (partnerId.isEmpty) return Stream.value(null);
+  if (partnerId.isEmpty) {
+    yield null;
+    return;
+  }
 
+  // 1. Build initial profile from couple_rooms.membersInfo
+  UserProfile? roomPartner;
+  if (room.membersInfo.containsKey(partnerId)) {
+    final info = room.membersInfo[partnerId]!;
+    roomPartner = UserProfile(
+      id: partnerId,
+      email: info['email'] as String? ?? '',
+      nickname: info['nickname'] as String? ?? '',
+      photoBase64: info['photoBase64'] as String?,
+      coupleRoomId: room.id,
+      createdAt: DateTime.now(),
+    );
+    yield roomPartner;
+  }
+
+  // 2. Also stream live from users/{partnerId} if available
   final profileRepo = ref.watch(userProfileRepositoryProvider);
-  return profileRepo.watchUserProfile(partnerId);
+  try {
+    await for (final firestoreProfile in profileRepo.watchUserProfile(partnerId)) {
+      if (firestoreProfile != null) {
+        yield firestoreProfile;
+      } else if (roomPartner != null) {
+        yield roomPartner;
+      }
+    }
+  } catch (_) {
+    if (roomPartner != null) yield roomPartner;
+  }
 });
 
 // ─── Subcategory Budgets Provider (Option A) ──────────────────────────────────
@@ -144,6 +176,19 @@ class CoupleNotifier extends StateNotifier<CoupleState> {
       );
       return false;
     }
+  }
+
+  /// Sync current user profile info into the couple room document
+  Future<void> syncMyProfile(UserProfile profile, String roomId) async {
+    try {
+      await _coupleRepo.syncMemberInfo(
+        roomId,
+        profile.id,
+        nickname: profile.nickname,
+        email: profile.email,
+        photoBase64: profile.photoBase64,
+      );
+    } catch (_) {}
   }
 
   void clearMessages() {

@@ -14,6 +14,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../core/utils/csv_exporter.dart';
+import '../../core/utils/name_helper.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -37,6 +38,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   Widget _buildAvatar(String? photoBase64, String nickname, Color bgColor, {double size = 32}) {
     if (photoBase64 != null && photoBase64.isNotEmpty) {
+      if (photoBase64.startsWith('http')) {
+        return CircleAvatar(
+          radius: size / 2,
+          backgroundImage: NetworkImage(photoBase64),
+        );
+      }
       try {
         final cleanBase64 = photoBase64.contains(',') ? photoBase64.split(',').last : photoBase64;
         return CircleAvatar(
@@ -175,19 +182,17 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     // 1. Check partner's nickname
     // 2. If partner hasn't set a nickname, pull name from their logged-in account (e.g. email prefix)
     // 3. If no partner connected yet, show "แฟน (รอเชื่อมต่อ)"
-    final userName = userProfile?.nickname.isNotEmpty == true
-        ? userProfile!.nickname
-        : (userProfile?.email.isNotEmpty == true ? userProfile!.email.split('@').first : 'ฉัน');
+    final userName = NameHelper.resolveDisplayName(
+      nickname: userProfile?.nickname,
+      email: userProfile?.email,
+      defaultFallback: 'ฉัน',
+    );
 
-    final String partnerName;
-    final partnerEmail = partnerProfile?.email ?? '';
-    if (partnerProfile?.nickname.isNotEmpty == true) {
-      partnerName = partnerProfile!.nickname;
-    } else if (partnerEmail.isNotEmpty) {
-      partnerName = partnerEmail.split('@').first;
-    } else {
-      partnerName = 'แฟน';
-    }
+    final String partnerName = NameHelper.resolveDisplayName(
+      nickname: partnerProfile?.nickname,
+      email: partnerProfile?.email,
+      defaultFallback: 'แฟน',
+    );
 
     final partnerPhoto = partnerProfile?.photoBase64;
 

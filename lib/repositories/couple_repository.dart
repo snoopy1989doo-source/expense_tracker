@@ -17,11 +17,26 @@ class CoupleRepository {
   }
 
   /// Create a new couple room and return it
-  Future<CoupleRoom> createCoupleRoom(String createdBy) async {
+  Future<CoupleRoom> createCoupleRoom(
+    String createdBy, {
+    String? nickname,
+    String? email,
+    String? photoBase64,
+  }) async {
     if (!_isAvailable) throw Exception('Firebase ไม่พร้อมใช้งาน');
 
     final code = _generateInviteCode();
     final roomRef = _firestore!.collection('couple_rooms').doc();
+
+    final Map<String, Map<String, dynamic>> initialMembers = {};
+    if (nickname != null || email != null) {
+      initialMembers[createdBy] = {
+        'nickname': nickname ?? '',
+        'email': email ?? '',
+        if (photoBase64 != null) 'photoBase64': photoBase64,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      };
+    }
 
     final room = CoupleRoom(
       id: roomRef.id,
@@ -29,6 +44,7 @@ class CoupleRepository {
       memberIds: [createdBy],
       createdBy: createdBy,
       createdAt: DateTime.now(),
+      membersInfo: initialMembers,
     );
 
     final batch = _firestore.batch();
@@ -61,7 +77,13 @@ class CoupleRepository {
   }
 
   /// Join an existing couple room via invite code
-  Future<CoupleRoom> joinCoupleRoom(String inviteCode, String userId) async {
+  Future<CoupleRoom> joinCoupleRoom(
+    String inviteCode,
+    String userId, {
+    String? nickname,
+    String? email,
+    String? photoBase64,
+  }) async {
     if (!_isAvailable) throw Exception('Firebase ไม่พร้อมใช้งาน');
 
     try {
@@ -86,11 +108,21 @@ class CoupleRepository {
         throw Exception('ห้องนี้มีสมาชิกครบแล้ว (2 คน)');
       }
 
+      final Map<String, dynamic> updateData = {};
       if (!room.memberIds.contains(userId)) {
-        // Add this user to the room
-        await db.collection('couple_rooms').doc(roomId).update({
-          'memberIds': FieldValue.arrayUnion([userId]),
-        });
+        updateData['memberIds'] = FieldValue.arrayUnion([userId]);
+      }
+      if (nickname != null || email != null) {
+        updateData['membersInfo.$userId'] = {
+          'nickname': nickname ?? '',
+          'email': email ?? '',
+          if (photoBase64 != null) 'photoBase64': photoBase64,
+          'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        };
+      }
+
+      if (updateData.isNotEmpty) {
+        await db.collection('couple_rooms').doc(roomId).update(updateData);
       }
 
       // Delete invite code after joining (one-time use)
@@ -106,6 +138,33 @@ class CoupleRepository {
       }
       throw Exception('ไม่สามารถเข้าร่วมห้องได้ (${e.code}): ${e.message}');
     }
+  }
+
+  /// Sync member profile (nickname, email, photo) directly into couple_rooms document
+  Future<void> syncMemberInfo(
+    String roomId,
+    String userId, {
+    required String nickname,
+    required String email,
+    String? photoBase64,
+  }) async {
+    if (!_isAvailable) return;
+    try {
+      final Map<String, dynamic> data = {
+        'nickname': nickname,
+        'email': email,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      };
+      if (photoBase64 != null && photoBase64.isNotEmpty) {
+        data['photoBase64'] = photoBase64;
+      }
+
+      await _firestore!.collection('couple_rooms').doc(roomId).set({
+        'membersInfo': {
+          userId: data,
+        },
+      }, SetOptions(merge: true));
+    } catch (_) {}
   }
 
   /// Stream of couple room (real-time updates)
